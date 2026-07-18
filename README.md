@@ -24,8 +24,43 @@ python scripts/pa_api.py corridas <ID>  # historial de ejecuciones (diagnóstico
 
 Requiere `pip install msal msal-extensions`. Usa login delegado con un client
 first-party de Microsoft (sin registrar apps; `--client-id` propio como fallback),
-tokens en caché cifrada local, y habla SOLO con `api.flow.microsoft.com`. Solo
-lectura: no modifica nada del tenant.
+tokens en caché cifrada local, y habla SOLO con APIs de Microsoft.
+
+### ✍️ Conectado — escritura (`pa-conectado`)
+
+Modificar y crear flujos **por lenguaje natural**, con triple red de seguridad:
+respaldo automático antes de tocar nada, auditoría previa que **bloquea**
+definiciones con hallazgos ALTA, y simulación por defecto (nada se ejecuta sin
+`--si`). Vía soportada por Microsoft (Dataverse) primero; maker API solo para
+flujos legacy.
+
+```bash
+python scripts/pa_api.py actualizar <ID> --archivo flujo.json --si  # modificar (con respaldo)
+python scripts/pa_api.py crear --archivo f.json --nombre "X" --si   # crear (nace apagado)
+python scripts/pa_api.py encender <ID> --si                         # activar
+```
+
+### 🔄 Vigilante del catálogo (`pa-actualizar`)
+
+`python scripts/actualizar_catalogo.py` — detecta commits y páginas nuevas en las
+fuentes oficiales (Microsoft Learn, Power CAT) para que las reglas nunca queden
+desactualizadas. Cadencia sugerida: mensual.
+
+## Úsalo desde cualquier agente (no solo Claude)
+
+El repo sigue los estándares abiertos **AGENTS.md** y **Agent Skills**:
+
+| Agente | Cómo |
+|---|---|
+| **Claude Code** | Plugin de este repo (marketplace) — skills en `skills/` |
+| **OpenAI Codex** (CLI/IDE/ChatGPT desktop) | Lee `AGENTS.md` y las skills de `.agents/skills/` automáticamente al abrir el repo |
+| **Gemini CLI / Code Assist** | Ídem (`AGENTS.md` + `.agents/skills/`; `GEMINI.md` incluido) |
+| **OpenCode** | Ídem (además lee `skills/` formato Claude tal cual) |
+
+Los scripts de `scripts/` son Python plano: cualquier agente con terminal los
+ejecuta. En el roadmap: servidor **MCP** (`uvx`) para conectar el proyecto a
+cualquier cliente MCP con una línea, y bundle **`.mcpb`** de doble clic para
+usuarios no técnicos en Claude Desktop.
 
 - **Privado y offline:** el análisis corre 100% en tu máquina (Python). No envía
   datos a ningún servicio externo. Ideal para datos sensibles (legal, RR.HH.).
@@ -81,17 +116,15 @@ power-automate-architect/
 
 ## En el roadmap
 
-- **✍️ Escritura (fase 3):** aplicar arreglos y crear flujos vía la **Web API de
-  Dataverse** (tabla `workflow`, la vía soportada por Microsoft) con confirmación
-  previa; migración de flujos legacy a soluciones. Arquitectura ya investigada en
-  `references/api-conexion.md`.
-- **🧙 Modo Copiloto (fase 4):** crear un flujo nuevo desde cero con pocas
-  preguntas, ya cumpliendo el catálogo de reglas.
-- **🔄 Actualizador (fase 5): ✅ entregado.** `python scripts/actualizar_catalogo.py`
-  detecta cambios en las fuentes oficiales (skill `pa-actualizar`); cadencia
-  mensual sugerida.
-- `skills/pa-conectado/` (despliegue vía `pac` CLI por soluciones) queda como vía
-  alternativa de ALM hasta que la fase 3 la reemplace.
+- **📡 Servidor MCP (`pa-architect-mcp`):** empaquetar el conector como servidor
+  MCP en PyPI (`uvx pa-architect-mcp`) — un solo binario que conecta el proyecto
+  a Claude, ChatGPT desktop, Codex, Gemini CLI y OpenCode. Cuidados ya
+  investigados: logs por stderr, device-code para login, caché persistente.
+- **🖱️ Bundle `.mcpb`:** instalador de doble clic para Claude Desktop (usuarios
+  no técnicos), publicado en GitHub Releases.
+- **🧙 Plantillas del Copiloto:** biblioteca de patrones 100/100 por caso de uso
+  (aprobaciones, alertas programadas, procesamiento de documentos con IA) para
+  acelerar el modo crear.
 
 > Alternativas evaluadas y descartadas para datos sensibles: FlowStudio MCP (SaaS
 > de pago) y MCPs de terceros — ver `references/panorama-herramientas.md` y

@@ -30,19 +30,19 @@ definición; `pa_api.py` lo sube por la vía soportada.
 
 ```bash
 # 1. Descargar la definicion actual
-python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" flujo <ID> --guardar flujo.json
+python "scripts/pa_api.py" flujo <ID> --guardar flujo.json
 ```
 2. **Editar `flujo.json`** aplicando el cambio pedido. Respeta el catálogo
-   (`${CLAUDE_PLUGIN_ROOT}/references/buenas-practicas.md`): nombres descriptivos,
+   (`references/buenas-practicas.md`): nombres descriptivos,
    Try/Catch con Terminate(Failed), filtros en origen, notes. NO inventes
    operationId/apiId: reutiliza los que ya están en la definición.
 3. **Auditar localmente** hasta que no queden ALTA:
-   `python "${CLAUDE_PLUGIN_ROOT}/scripts/auditar_flujo.py" flujo.json`
+   `python "scripts/auditar_flujo.py" flujo.json`
 4. **Mostrar al usuario un resumen del cambio** (qué acciones se agregan/cambian,
    puntuación antes → después) y **pedir confirmación explícita**.
 5. Subir (primero sin `--si` para el dry-run; con OK del usuario, con `--si`):
    ```bash
-   python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" actualizar <ID> --archivo flujo.json --si
+   python "scripts/pa_api.py" actualizar <ID> --archivo flujo.json --si
    ```
 6. **Validar**: `corridas <ID>` tras la siguiente ejecución (o pedir al usuario
    que lo dispare) y reportar en simple: "Apliqué X, respaldo en Y, última
@@ -54,11 +54,11 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" flujo <ID> --guardar flujo.json
    datos, y acción final (¿a quién avisa / qué escribe?). No interrogues: propone.
 2. **Genera la definición** cumpliendo el catálogo desde el inicio (Try/Catch,
    trigger conditions, filtros, nombres en español, description del flujo).
-   Base útil: `${CLAUDE_PLUGIN_ROOT}/evals/flujos/flujo-limpio.json` (estructura
+   Base útil: `evals/flujos/flujo-limpio.json` (estructura
    100/100). Para IA/agent flows revisa `references/ia-en-flujos.md`.
 3. Audita local hasta 🟢, muestra el plan al usuario y con su OK:
    ```bash
-   python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" crear --archivo nuevo.json --nombre "Área - Qué hace (Disparador)" --si
+   python "scripts/pa_api.py" crear --archivo nuevo.json --nombre "Área - Qué hace (Disparador)" --si
    ```
 4. El flujo **nace APAGADO**. Si usa conectores, el usuario debe abrir el flujo
    una vez en el portal para **enlazar las conexiones** (eso no se puede hacer
@@ -67,8 +67,8 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" flujo <ID> --guardar flujo.json
 ## Encender / apagar
 
 ```bash
-python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" encender <ID> --si
-python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" apagar <ID> --si
+python "scripts/pa_api.py" encender <ID> --si
+python "scripts/pa_api.py" apagar <ID> --si
 ```
 
 ## Reglas de oro

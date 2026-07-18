@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.0] — 2026-07-18
+
+### Agregado — Fase 3: escritura por lenguaje natural + portabilidad multi-agente
+- **Escritura en `scripts/pa_api.py`**: `actualizar` (reemplaza la definición),
+  `crear` (nace apagado), `encender`/`apagar`. Vía soportada (Dataverse, tabla
+  `workflow`: PATCH `clientdata` con `If-Match`, POST con `category 5`) y
+  fallback maker API para flujos legacy. Triple red de seguridad: respaldo
+  automático en `~/.power-automate-architect/respaldos/`, auditoría previa que
+  bloquea hallazgos ALTA (`--forzar` para anular), y dry-run por defecto
+  (`--si` para ejecutar). Verificado en vivo (dry-run + gate) y offline
+  (`evals/verificar_conector.py`: 18/18).
+- **Skill `pa-conectado` reescrita**: ciclo por lenguaje natural
+  descargar → editar → auditar → confirmar → subir → validar corridas; creación
+  guiada con máx. 2-3 preguntas partiendo de `flujo-limpio.json`.
+- **Portabilidad multi-agente (investigada e implementada, fase 0):**
+  `AGENTS.md` canónico (estándar Linux Foundation, 28+ herramientas),
+  `CLAUDE.md` reducido a import `@AGENTS.md` + notas propias, `GEMINI.md`
+  puntero, y espejo `.agents/skills/` (estándar Agent Skills que leen Codex,
+  Gemini CLI y OpenCode) generado por `scripts/sincronizar_skills.py`
+  (convierte `${CLAUDE_PLUGIN_ROOT}` a rutas relativas). Roadmap: servidor MCP
+  en PyPI (capa universal: los 4 ecosistemas son clientes MCP) y bundle
+  `.mcpb` de doble clic para no técnicos.
+
 ## [0.4.0] — 2026-07-18
 
 ### Agregado — IA + actualizador permanente (fase 5)

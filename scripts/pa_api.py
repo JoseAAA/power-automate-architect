@@ -8,8 +8,20 @@ Uso:
   python pa_api.py flujos [--entorno ID]   Lista TODOS tus flujos (Mis flujos + soluciones)
   python pa_api.py flujo <flowId> [--guardar ruta.json]   Detalle/definicion de un flujo
   python pa_api.py corridas <flowId>       Historial de ejecuciones
-  python pa_api.py auditar <flowId>        Descarga el flujo y corre el auditor (34 reglas)
+  python pa_api.py auditar <flowId>        Descarga el flujo y corre el auditor local
+  python pa_api.py actualizar <flowId> --archivo f.json --si   Modifica un flujo (con respaldo)
+  python pa_api.py crear --archivo f.json --nombre "X" --si    Crea un flujo (nace apagado)
+  python pa_api.py encender <flowId> --si  Activa un flujo
+  python pa_api.py apagar <flowId> --si    Desactiva un flujo
   python pa_api.py logout                  Borra la sesion local
+
+Escritura (seguridad):
+  - SIEMPRE respalda el flujo actual antes de tocarlo (en ~/.power-automate-architect/respaldos/).
+  - SIEMPRE audita la definicion nueva antes de subirla; si hay hallazgos ALTA se
+    niega salvo --forzar.
+  - Sin --si solo muestra que haria (dry-run). Via Dataverse (soportada por
+    Microsoft) cuando el flujo vive en la tabla workflow; maker API como fallback
+    para flujos legacy.
 
 Opciones comunes: --entorno <id> (por defecto: el entorno predeterminado del tenant),
 --tenant <id|dominio>, --client-id <guid>.
@@ -142,11 +154,12 @@ def _token_para(scopes, interactivo=False, device=False, client_id=None, tenant=
 # ---------------------------------------------------------------------------
 # HTTP (unico punto de salida a la red; endpoints intercambiables)
 # ---------------------------------------------------------------------------
-def _http(metodo, url, token, cuerpo=None, intentos=3):
+def _http(metodo, url, token, cuerpo=None, intentos=3, cabeceras=None, con_cabeceras=False):
     for i in range(intentos):
         r = requests.request(
             metodo, url,
-            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
+                     **(cabeceras or {})},
             json=cuerpo, timeout=60)
         if r.status_code == 429 or r.status_code >= 500:
             espera = int(r.headers.get("Retry-After", 2 ** (i + 1)))
@@ -161,7 +174,8 @@ def _http(metodo, url, token, cuerpo=None, intentos=3):
             raise PaApiError("No encontrado (404): revisa el id de entorno/flujo.")
         if not r.ok:
             raise PaApiError(f"HTTP {r.status_code}: {r.text[:300]}")
-        return r.json() if r.text else {}
+        datos = r.json() if r.text else {}
+        return (datos, r.headers) if con_cabeceras else datos
     raise PaApiError("Demasiados reintentos (throttling). Espera un momento y vuelve a intentar.")
 
 
@@ -234,6 +248,135 @@ def guardar_flujo(flujo, ruta):
     ruta.parent.mkdir(parents=True, exist_ok=True)
     ruta.write_text(json.dumps(doc, indent=2, ensure_ascii=False), encoding="utf-8")
     return ruta
+
+
+# ---------------------------------------------------------------------------
+# Escritura: Dataverse (via soportada) primero, maker API como fallback legacy.
+# Ver references/api-conexion.md.
+# ---------------------------------------------------------------------------
+def _entorno_dataverse(token, entorno):
+    """(instanceUrl, instanceApiUrl) del entorno, o (None, None) si no tiene Dataverse."""
+    for e in listar_entornos(token):
+        if e.get("name") == entorno:
+            md = (e.get("properties", {}) or {}).get("linkedEnvironmentMetadata") or {}
+            inst = str(md.get("instanceUrl") or "").rstrip("/")
+            api = str(md.get("instanceApiUrl") or inst).rstrip("/")
+            return (inst or None), (api or None)
+    return None, None
+
+
+def _token_dv(inst_url, client_id=None, tenant=None):
+    tok, _ = _token_para([f"{inst_url}/.default"], client_id=client_id, tenant=tenant)
+    return tok
+
+
+def buscar_workflow(tok_dv, api_base, flow_id):
+    """Fila de la tabla workflow (Dataverse) para un flujo, o None si es legacy."""
+    url = (f"{api_base}/api/data/v9.2/workflows"
+           f"?$filter=workflowidunique eq {flow_id} and category eq 5"
+           f"&$select=workflowid,name,statecode,clientdata")
+    filas = _http("GET", url, tok_dv).get("value", [])
+    return filas[0] if filas else None
+
+
+def _cargar_definicion_archivo(ruta):
+    """Lee un .json (formato completo o definicion pelada) -> (definition, connrefs)."""
+    obj = json.loads(Path(ruta).read_text(encoding="utf-8"))
+    props = obj.get("properties", obj) if isinstance(obj, dict) else {}
+    defn = props.get("definition") or (obj if "actions" in obj and "triggers" in obj else None)
+    if not defn:
+        raise PaApiError(f"{ruta} no contiene una definicion valida (triggers/actions).")
+    connrefs = props.get("connectionReferences") or {}
+    return defn, connrefs
+
+
+def _respaldar(token, entorno, flow_id):
+    """Descarga el flujo actual a ~/.power-automate-architect/respaldos/ antes de tocarlo."""
+    flujo = obtener_flujo(token, entorno, flow_id)
+    marca = time.strftime("%Y%m%d-%H%M%S")
+    ruta = DIR_CONFIG / "respaldos" / f"{flow_id}-{marca}.json"
+    return guardar_flujo(flujo, ruta), flujo
+
+
+def _preauditar(defn, connrefs):
+    """Audita la definicion nueva ANTES de subirla. Devuelve (exit_code, salida)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        ruta = Path(tmp) / "definition.json"
+        ruta.write_text(json.dumps({"properties": {
+            "displayName": "candidata", "description": "x",
+            "definition": defn, "connectionReferences": connrefs}},
+            ensure_ascii=False), encoding="utf-8")
+        r = subprocess.run([sys.executable, str(AUDITOR), str(ruta)],
+                           capture_output=True, text=True, encoding="utf-8")
+        return r.returncode, r.stdout or ""
+
+
+def actualizar_flujo(token, entorno, flow_id, defn, connrefs=None,
+                     client_id=None, tenant=None):
+    """Reemplaza la definicion de un flujo existente. Devuelve dict con via y respaldo."""
+    respaldo, _flujo = _respaldar(token, entorno, flow_id)
+    inst, api = _entorno_dataverse(token, entorno)
+    if inst:
+        tok_dv = _token_dv(inst, client_id, tenant)
+        fila = buscar_workflow(tok_dv, api, flow_id)
+        if fila:
+            cd = json.loads(fila.get("clientdata") or "{}")
+            props = cd.setdefault("properties", {})
+            props["definition"] = defn
+            if connrefs:
+                props["connectionReferences"] = connrefs
+            _http("PATCH", f"{api}/api/data/v9.2/workflows({fila['workflowid']})",
+                  tok_dv, {"clientdata": json.dumps(cd, ensure_ascii=False)},
+                  cabeceras={"If-Match": "*"})
+            return {"via": "dataverse (soportada)", "respaldo": str(respaldo),
+                    "workflowid": fila["workflowid"]}
+    # Fallback: flujo legacy fuera de Dataverse -> maker API (misma llamada del portal)
+    cuerpo = {"properties": {"definition": defn}}
+    if connrefs:
+        cuerpo["properties"]["connectionReferences"] = connrefs
+    _http("PATCH", f"{API_FLOW}/providers/Microsoft.ProcessSimple/environments/{entorno}"
+          f"/flows/{flow_id}?api-version={APIVER}", token, cuerpo)
+    return {"via": "maker API (flujo legacy)", "respaldo": str(respaldo)}
+
+
+def crear_flujo(token, entorno, nombre, defn, connrefs=None, client_id=None, tenant=None):
+    """Crea un flujo nuevo (nace APAGADO). Devuelve dict con via e id."""
+    inst, api = _entorno_dataverse(token, entorno)
+    if inst:
+        tok_dv = _token_dv(inst, client_id, tenant)
+        cd = {"properties": {"connectionReferences": connrefs or {}, "definition": defn},
+              "schemaVersion": "1.0.0.0"}
+        _, cab = _http("POST", f"{api}/api/data/v9.2/workflows", tok_dv,
+                       {"category": 5, "name": nombre, "type": 1,
+                        "primaryentity": "none",
+                        "clientdata": json.dumps(cd, ensure_ascii=False)},
+                       con_cabeceras=True)
+        ent = str(cab.get("OData-EntityId", ""))
+        wf_id = ent[ent.rfind("(") + 1: ent.rfind(")")] if "(" in ent else "?"
+        return {"via": "dataverse (soportada)", "workflowid": wf_id}
+    cuerpo = {"properties": {"displayName": nombre, "state": "Stopped",
+                             "definition": defn,
+                             "connectionReferences": connrefs or {}}}
+    r = _http("POST", f"{API_FLOW}/providers/Microsoft.ProcessSimple/environments/{entorno}"
+              f"/flows?api-version={APIVER}", token, cuerpo)
+    return {"via": "maker API", "workflowid": r.get("name", "?")}
+
+
+def cambiar_estado(token, entorno, flow_id, encender, client_id=None, tenant=None):
+    """Enciende (True) o apaga (False) un flujo. Devuelve la via usada."""
+    inst, api = _entorno_dataverse(token, entorno)
+    if inst:
+        tok_dv = _token_dv(inst, client_id, tenant)
+        fila = buscar_workflow(tok_dv, api, flow_id)
+        if fila:
+            _http("PATCH", f"{api}/api/data/v9.2/workflows({fila['workflowid']})",
+                  tok_dv, {"statecode": 1 if encender else 0},
+                  cabeceras={"If-Match": "*"})
+            return "dataverse (soportada)"
+    accion = "start" if encender else "stop"
+    _http("POST", f"{API_FLOW}/providers/Microsoft.ProcessSimple/environments/{entorno}"
+          f"/flows/{flow_id}/{accion}?api-version={APIVER}", token)
+    return "maker API"
 
 
 # ---------------------------------------------------------------------------
@@ -351,6 +494,66 @@ def cmd_auditar(args):
         return r.returncode
 
 
+def _preparar_escritura(args, necesita_archivo=True):
+    """Pasos comunes de escritura: token, entorno, definicion nueva y auditoria previa."""
+    token, _ = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
+    entorno = args.entorno or entorno_por_defecto(token)
+    defn = connrefs = None
+    if necesita_archivo:
+        defn, connrefs = _cargar_definicion_archivo(args.archivo)
+        codigo, salida = _preauditar(defn, connrefs)
+        linea = next((l for l in salida.splitlines() if "PUNTUACION" in l), "")
+        print(f"Auditoria previa de la definicion nueva: {linea.strip() or '?'}")
+        if codigo == 1 and not getattr(args, "forzar", False):
+            print(salida)
+            raise PaApiError(
+                "La definicion nueva tiene hallazgos de severidad ALTA (ver arriba). "
+                "Corrigelos antes de subirla, o usa --forzar bajo tu responsabilidad.")
+        if codigo == 2:
+            raise PaApiError("No pude auditar el archivo: definicion invalida.")
+    return token, entorno, defn, connrefs
+
+
+def cmd_actualizar(args):
+    token, entorno, defn, connrefs = _preparar_escritura(args)
+    if not args.si:
+        print(f"\n[SIMULACION] Actualizaria el flujo {args.flow_id} en {entorno} "
+              f"(con respaldo previo automatico). Agrega --si para ejecutar.")
+        return 0
+    r = actualizar_flujo(token, entorno, args.flow_id, defn, connrefs,
+                         client_id=args.client_id, tenant=args.tenant)
+    print(f"\nFlujo actualizado via {r['via']}.")
+    print(f"Respaldo del estado anterior: {r['respaldo']}")
+    print("Sugerencia: valida con  python pa_api.py corridas " + args.flow_id)
+    return 0
+
+
+def cmd_crear(args):
+    token, entorno, defn, connrefs = _preparar_escritura(args)
+    if not args.si:
+        print(f"\n[SIMULACION] Crearia el flujo '{args.nombre}' en {entorno} "
+              f"(nace APAGADO). Agrega --si para ejecutar.")
+        return 0
+    r = crear_flujo(token, entorno, args.nombre, defn, connrefs,
+                    client_id=args.client_id, tenant=args.tenant)
+    print(f"\nFlujo '{args.nombre}' creado via {r['via']}.  ID: {r['workflowid']}")
+    print("Nace APAGADO. Si usa conectores, enlaza las conexiones en el portal y luego:")
+    print(f"  python pa_api.py encender {r['workflowid']} --si")
+    return 0
+
+
+def cmd_estado(args, encender):
+    token, entorno, _, _ = _preparar_escritura(args, necesita_archivo=False)
+    verbo = "encenderia" if encender else "apagaria"
+    if not args.si:
+        print(f"[SIMULACION] {verbo} el flujo {args.flow_id} en {entorno}. Agrega --si para ejecutar.")
+        return 0
+    via = cambiar_estado(token, entorno, args.flow_id, encender,
+                         client_id=args.client_id, tenant=args.tenant)
+    print(f"Flujo {'encendido' if encender else 'apagado'} via {via}.")
+    return 0
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -378,6 +581,24 @@ def main():
     p.set_defaults(fn=cmd_corridas)
     p = sub.add_parser("auditar", help="Descargar un flujo y auditarlo"); comunes(p)
     p.add_argument("flow_id"); p.set_defaults(fn=cmd_auditar)
+
+    def escritura(p):
+        comunes(p)
+        p.add_argument("--si", action="store_true", help="ejecutar de verdad (sin esto: simulacion)")
+    p = sub.add_parser("actualizar", help="Reemplazar la definicion de un flujo (con respaldo)")
+    escritura(p); p.add_argument("flow_id")
+    p.add_argument("--archivo", required=True, help="ruta .json con la definicion nueva")
+    p.add_argument("--forzar", action="store_true", help="subir aunque la auditoria previa tenga ALTA")
+    p.set_defaults(fn=cmd_actualizar)
+    p = sub.add_parser("crear", help="Crear un flujo nuevo (nace apagado)")
+    escritura(p); p.add_argument("--archivo", required=True, help="ruta .json con la definicion")
+    p.add_argument("--nombre", required=True, help="nombre del flujo nuevo")
+    p.add_argument("--forzar", action="store_true", help="crear aunque la auditoria previa tenga ALTA")
+    p.set_defaults(fn=cmd_crear)
+    p = sub.add_parser("encender", help="Activar un flujo"); escritura(p)
+    p.add_argument("flow_id"); p.set_defaults(fn=lambda a: cmd_estado(a, True))
+    p = sub.add_parser("apagar", help="Desactivar un flujo"); escritura(p)
+    p.add_argument("flow_id"); p.set_defaults(fn=lambda a: cmd_estado(a, False))
 
     args = ap.parse_args()
     try:
