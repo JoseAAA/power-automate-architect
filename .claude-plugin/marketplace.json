@@ -1,0 +1,11 @@
+{
+  "name": "power-automate-architect-marketplace",
+  "owner": { "name": "Power Automate Architect contributors" },
+  "plugins": [
+    {
+      "name": "power-automate-architect",
+      "source": "./",
+      "description": "Auditor y copiloto experto de flujos de Power Automate. Diagnostica un flujo exportado contra las mejores practicas oficiales de Microsoft y de la comunidad, y guia la creacion de flujos nuevos. Offline, privado y eficiente en tokens."
+    }
+  ]
+}

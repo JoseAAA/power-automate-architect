@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Credenciales / tokens (NUNCA versionar)
+*.token
+*.cache
+token_cache*.json
+.msal_cache*
+
+# Flujos del usuario (datos potencialmente sensibles)
+*.zip
+flujos-locales/
+
+# SO / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

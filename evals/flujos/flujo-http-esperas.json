@@ -1,0 +1,94 @@
+{
+  "properties": {
+    "displayName": "Prueba 2 - Trigger HTTP, esperas y variables",
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "Http",
+          "inputs": { "schema": { "type": "object" } }
+        }
+      },
+      "actions": {
+        "Initialize_variable": {
+          "type": "InitializeVariable",
+          "runAfter": {},
+          "inputs": { "variables": [ { "name": "varSinUso", "type": "array", "value": [] } ] }
+        },
+        "Initialize_variable_2": {
+          "type": "InitializeVariable",
+          "runAfter": { "Initialize_variable": ["Succeeded"] },
+          "inputs": { "variables": [ { "name": "varEstatica", "type": "string", "value": "hola" } ] }
+        },
+        "Compose": {
+          "type": "Compose",
+          "runAfter": { "Initialize_variable_2": ["Succeeded"] },
+          "inputs": "@variables('varEstatica')"
+        },
+        "Try": {
+          "type": "Scope",
+          "runAfter": { "Compose": ["Succeeded"] },
+          "actions": {
+            "Esperar_aprobacion": {
+              "type": "OpenApiConnectionWebhook",
+              "runAfter": {},
+              "inputs": {
+                "host": { "connectionName": "shared_approvals", "operationId": "StartAndWaitForAnApproval", "apiId": "/providers/Microsoft.PowerApps/apis/shared_approvals" },
+                "parameters": { "approvalType": "Basic" }
+              }
+            },
+            "Do_until": {
+              "type": "Until",
+              "runAfter": { "Esperar_aprobacion": ["Succeeded"] },
+              "expression": "@equals(variables('varEstatica'), 'listo')",
+              "actions": {
+                "Delay": {
+                  "type": "Wait",
+                  "runAfter": {},
+                  "inputs": { "interval": { "count": 5, "unit": "Minute" } }
+                }
+              }
+            }
+          }
+        },
+        "Recorrer_items_del_trigger": {
+          "type": "Foreach",
+          "runAfter": { "Try": ["Succeeded"] },
+          "foreach": "@triggerBody()?['items']",
+          "actions": {
+            "Terminar_dentro_del_bucle": {
+              "type": "Terminate",
+              "runAfter": {},
+              "inputs": { "runStatus": "Cancelled" }
+            }
+          }
+        },
+        "Catch": {
+          "type": "Scope",
+          "runAfter": { "Try": ["Failed", "TimedOut"] },
+          "actions": {
+            "Redactar_error": {
+              "type": "Compose",
+              "runAfter": {},
+              "inputs": "@result('Try')"
+            }
+          }
+        },
+        "HTTP_notificar": {
+          "type": "Http",
+          "runAfter": { "Recorrer_items_del_trigger": ["Succeeded"] },
+          "inputs": {
+            "method": "POST",
+            "uri": "https://api.interna.local/avisar",
+            "headers": { "Authorization": "@variables('varEstatica')" }
+          }
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_approvals": { "connectionName": "aprobaciones", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_approvals" }
+    }
+  }
+}

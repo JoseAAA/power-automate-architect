@@ -1,0 +1,9 @@
+{
+  "name": "power-automate-architect",
+  "displayName": "Power Automate Architect",
+  "version": "0.4.0",
+  "description": "Copiloto experto para Power Automate. Modo Auditor: diagnostica un flujo (exportado o directo del tenant) contra 34 reglas de mejores practicas de Microsoft (coding guidelines, Well-Architected, Power CAT) con puntuacion, severidad y arreglo concreto. Modo conectado de lectura: un solo login Microsoft (MSAL, sin registrar apps) para listar, descargar y auditar TODOS tus flujos sin exportar zips. Sin terceros: analisis local, datos directo a Microsoft. Facil para expertos y no expertos.",
+  "author": { "name": "Power Automate Architect contributors" },
+  "license": "MIT",
+  "keywords": ["power-automate", "cloud-flows", "auditoria", "mejores-practicas", "coding-guidelines", "well-architected", "alm", "power-platform"]
+}

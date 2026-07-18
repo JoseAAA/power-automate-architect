@@ -1,0 +1,78 @@
+{
+  "properties": {
+    "displayName": "Prueba - Flujo con malas practicas",
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "triggers": {
+        "When_an_item_is_created": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": { "connectionName": "shared_sharepointonline", "operationId": "GetOnNewItems", "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
+            "parameters": { "dataset": "https://contoso.sharepoint.com/sites/legal", "table": "contratos" }
+          }
+        }
+      },
+      "actions": {
+        "Initialize_variable": {
+          "type": "InitializeVariable",
+          "runAfter": {},
+          "inputs": { "variables": [ { "name": "varResultados", "type": "array", "value": [] } ] }
+        },
+        "Get_items": {
+          "type": "OpenApiConnection",
+          "runAfter": { "Initialize_variable": ["Succeeded"] },
+          "runtimeConfiguration": { "staticResult": { "name": "GetItems0", "staticResultOptions": "Enabled" } },
+          "inputs": {
+            "host": { "connectionName": "shared_sharepointonline", "operationId": "GetItems", "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
+            "parameters": { "dataset": "https://contoso.sharepoint.com/sites/legal", "table": "contratos" }
+          }
+        },
+        "HTTP": {
+          "type": "Http",
+          "runAfter": { "Get_items": ["Succeeded"] },
+          "inputs": {
+            "method": "POST",
+            "uri": "https://api.ejemplo.com/notificar",
+            "headers": { "api_key": "sk-live-abcdef1234567890" },
+            "body": { "fecha": "@addHours(utcNow(), -5)" }
+          }
+        },
+        "Apply_to_each": {
+          "type": "Foreach",
+          "runAfter": { "HTTP": ["Succeeded"] },
+          "runtimeConfiguration": { "concurrency": { "repetitions": 10 } },
+          "foreach": "@outputs('Get_items')?['body/value']",
+          "actions": {
+            "Condition": {
+              "type": "If",
+              "expression": { "and": [ { "greater": [ "@items('Apply_to_each')?['Monto']", 1000 ] } ] },
+              "actions": {
+                "Append_to_array_variable": {
+                  "type": "AppendToArrayVariable",
+                  "inputs": { "name": "varResultados", "value": "@items('Apply_to_each')" }
+                },
+                "Apply_to_each_2": {
+                  "type": "Foreach",
+                  "foreach": "@items('Apply_to_each')?['Anexos']",
+                  "actions": {
+                    "Update_item": {
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": { "connectionName": "shared_sharepointonline", "operationId": "PatchItem", "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
+                        "parameters": { "dataset": "https://contoso.sharepoint.com/sites/legal", "table": "contratos" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_sharepointonline": { "connectionName": "shared-sharepointonline-1", "source": "Embedded", "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" }
+    }
+  }
+}

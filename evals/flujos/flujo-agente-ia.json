@@ -1,0 +1,56 @@
+{
+  "properties": {
+    "displayName": "Prueba IA - Agent flow con malas practicas",
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "Skills",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "text": { "type": "string" },
+                "text_1": { "type": "string" }
+              },
+              "required": []
+            }
+          }
+        }
+      },
+      "actions": {
+        "Apply_to_each": {
+          "type": "Foreach",
+          "runAfter": {},
+          "foreach": "@triggerBody()?['text']",
+          "actions": {
+            "Run_a_prompt": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "aibuilderpredict",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "recordId": "11111111-2222-3333-4444-555555555555",
+                  "item/requestv2/text": "@items('Apply_to_each')"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_commondataserviceforapps": {
+        "connectionName": "dataverse-ia",
+        "source": "Invoker",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+      }
+    }
+  }
+}

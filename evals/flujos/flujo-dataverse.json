@@ -1,0 +1,32 @@
+{
+  "properties": {
+    "displayName": "Prueba 3 - Dataverse: bucle infinito y filtros",
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "triggers": {
+        "Cuando_se_modifica_un_contrato": {
+          "type": "OpenApiConnection",
+          "runtimeConfiguration": { "concurrency": { "runs": 1 } },
+          "inputs": {
+            "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "SubscribeWebhookTrigger", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+            "parameters": { "subscriptionRequest/message": 3, "subscriptionRequest/entityname": "contratos", "subscriptionRequest/scope": 4 }
+          }
+        }
+      },
+      "actions": {
+        "Actualizar_contrato": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+            "parameters": { "entityname": "contratos", "recordId": "@triggerOutputs()?['body/contratoid']", "item/estado": 1 }
+          }
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_commondataserviceforapps": { "connectionName": "dataverse-legal", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" }
+    }
+  }
+}
