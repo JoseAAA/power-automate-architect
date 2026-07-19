@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.7.0] — 2026-07-18
+
+### Agregado — servidor MCP para clientes GUI (validado con evidencia experta)
+- Investigación previa (Anthropic engineering, eval de Arize 500 corridas,
+  Ronacher, Willison, guía de seguridad de Microsoft jun-2026): CLI+skills
+  sigue siendo la vía para agentes con terminal (igual exactitud, ~6x más
+  barato); MCP se construye **solo** como puerta para GUI sin terminal.
+  ChatGPT queda fuera de v1 (solo acepta MCP remoto HTTPS).
+- **`scripts/pa_mcp.py`**: adaptador delgado (SDK oficial `mcp`, stdio) con 7
+  herramientas con forma de tarea: `iniciar_sesion` (device code devuelto como
+  RESULTADO de herramienta), `estado_sesion`, `listar_flujos`, `auditar_flujo`,
+  `ver_corridas`, `simular_cambio` y `aplicar_cambio`. Seguridad de escritura
+  **en el contrato**: simular → auditoría que bloquea ALTA → token de un solo
+  uso (15 min) → aplicar (con respaldo automático del núcleo); anotaciones
+  `readOnlyHint`/`destructiveHint` para la UI de permisos del cliente.
+- `evals/verificar_mcp.py`: 12/12 offline (API simulada) — incluye token de un
+  solo uso, rechazo sin simulación y gate de ALTA.
+- Empaquetado: `pyproject.toml` (PyPI → `uvx pa-architect-mcp`) y `mcpb/`
+  (manifest + pasos del bundle de doble clic para Claude Desktop, con los bugs
+  conocidos de Windows/uv documentados).
+
 ## [0.6.0] — 2026-07-18
 
 ### Agregado — contrato JSON agente-agnóstico (estudio de Fission-AI/OpenSpec)

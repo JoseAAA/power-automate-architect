@@ -56,11 +56,15 @@ El repo sigue los estándares abiertos **AGENTS.md** y **Agent Skills**:
 | **OpenAI Codex** (CLI/IDE/ChatGPT desktop) | Lee `AGENTS.md` y las skills de `.agents/skills/` automáticamente al abrir el repo |
 | **Gemini CLI / Code Assist** | Ídem (`AGENTS.md` + `.agents/skills/`; `GEMINI.md` incluido) |
 | **OpenCode** | Ídem (además lee `skills/` formato Claude tal cual) |
+| **Claude Desktop (no técnicos)** | Servidor MCP `scripts/pa_mcp.py` — bundle `.mcpb` de doble clic (ver `mcpb/`) o `uvx pa-architect-mcp` |
 
 Los scripts de `scripts/` son Python plano: cualquier agente con terminal los
-ejecuta. En el roadmap: servidor **MCP** (`uvx`) para conectar el proyecto a
-cualquier cliente MCP con una línea, y bundle **`.mcpb`** de doble clic para
-usuarios no técnicos en Claude Desktop.
+ejecuta. **Diseño validado con evidencia** (Anthropic engineering, eval de
+Arize, Ronacher/Willison): para agentes con terminal, CLI+skills es ~6x más
+barato que MCP con la misma exactitud → MCP queda **solo** para clientes GUI
+sin terminal (7 herramientas, confirmación por token de un solo uso,
+anotaciones read-only/destructive). ChatGPT web/desktop solo acepta MCP remoto
+(HTTPS): fuera del alcance local-first por ahora.
 
 - **Privado y offline:** el análisis corre 100% en tu máquina (Python). No envía
   datos a ningún servicio externo. Ideal para datos sensibles (legal, RR.HH.).
@@ -116,15 +120,14 @@ power-automate-architect/
 
 ## En el roadmap
 
-- **📡 Servidor MCP (`pa-architect-mcp`):** empaquetar el conector como servidor
-  MCP en PyPI (`uvx pa-architect-mcp`) — un solo binario que conecta el proyecto
-  a Claude, ChatGPT desktop, Codex, Gemini CLI y OpenCode. Cuidados ya
-  investigados: logs por stderr, device-code para login, caché persistente.
-- **🖱️ Bundle `.mcpb`:** instalador de doble clic para Claude Desktop (usuarios
-  no técnicos), publicado en GitHub Releases.
+- **📦 Release público:** publicar `pa-architect-mcp` en PyPI y el `.mcpb` en
+  GitHub Releases (pasos en `mcpb/README.md`); registrar en el MCP Registry.
 - **🧙 Plantillas del Copiloto:** biblioteca de patrones 100/100 por caso de uso
   (aprobaciones, alertas programadas, procesamiento de documentos con IA) para
   acelerar el modo crear.
+- **🌐 Conector remoto (solo si una empresa lo pide):** MCP por HTTPS
+  auto-hosteado en el tenant del cliente — habilitaría claude.ai web/móvil y
+  ChatGPT manteniendo el principio local-first.
 
 > Alternativas evaluadas y descartadas para datos sensibles: FlowStudio MCP (SaaS
 > de pago) y MCPs de terceros — ver `references/panorama-herramientas.md` y

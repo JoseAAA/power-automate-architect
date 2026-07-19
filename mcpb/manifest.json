@@ -1,0 +1,25 @@
+{
+  "manifest_version": "0.2",
+  "name": "power-automate-architect",
+  "display_name": "Power Automate Architect",
+  "version": "0.7.0",
+  "description": "Audita, diagnostica, modifica y crea tus flujos de Power Automate hablando en espanol. Local y privado: solo habla con Microsoft usando tu propio login (device code); nada pasa por terceros.",
+  "author": { "name": "Power Automate Architect contributors" },
+  "license": "MIT",
+  "server": {
+    "type": "python",
+    "entry_point": "server/pa_mcp.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with", "mcp",
+        "--with", "msal",
+        "--with", "msal-extensions",
+        "--with", "requests",
+        "${__dirname}/server/pa_mcp.py"
+      ],
+      "env": { "PYTHONUNBUFFERED": "1" }
+    }
+  }
+}
