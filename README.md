@@ -1,175 +1,138 @@
 # ⚡ Power Automate Architect
 
-![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Licencia](https://img.shields.io/badge/Licencia-MIT-green)
-![AGENTS.md](https://img.shields.io/badge/est%C3%A1ndar-AGENTS.md-blue)
-![Agent Skills](https://img.shields.io/badge/est%C3%A1ndar-Agent%20Skills-blueviolet)
-![Local first](https://img.shields.io/badge/privacidad-100%25%20local-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
+![Funciona con](https://img.shields.io/badge/funciona%20con-Claude%20Code%20·%20Codex%20·%20Gemini%20CLI%20·%20OpenCode-blueviolet)
+![Privacidad](https://img.shields.io/badge/privacidad-100%25%20local-brightgreen)
 
-> Habla con tu asistente de IA en español y **audita, arregla y crea flujos de
-> Power Automate** con las mejores prácticas oficiales de Microsoft. Sin exportar
-> zips, sin servidores de terceros: un login de Microsoft y listo.
+**Audita, corrige y crea flujos de Power Automate hablándole a tu asistente de IA en español — 100% local, con tu propio login de Microsoft.**
+
+Son instrucciones reutilizables (skills) + scripts deterministas que le enseñan a
+Claude Code, Codex, Gemini CLI u OpenCode a trabajar con Microsoft Power Automate
+siguiendo las mejores prácticas oficiales (Microsoft Learn, Well-Architected,
+Power CAT). Para makers y equipos que automatizan con datos sensibles: nada pasa
+por servidores de terceros.
 
 ---
 
-## 📋 Contenido
+## 👀 Míralo en acción
 
-- [🚀 Instalación](#-instalación)
-- [✨ Funciones](#-funciones)
-- [💬 Cómo se usa (ejemplos reales)](#-cómo-se-usa-ejemplos-reales)
-- [🧠 Cómo funciona](#-cómo-funciona)
-- [🔐 Privacidad](#-privacidad)
-- [🩺 Problemas comunes](#-problemas-comunes)
-- [🧰 Stack](#-stack)
-- [🗺️ Roadmap](#️-roadmap)
+```text
+Tú ▸ audita mi flujo exportado facturas.zip
+
+Agente ▸ PUNTUACIÓN: 55/100 → ACEPTABLE, requiere mejoras
+         🔴 [ALTA]  Sin manejo de errores: si un paso falla, nadie se entera
+                    Arreglo: Scope "Try" + Scope "Catch" + Terminate(Failed)
+         🟠 [MEDIA] Listado sin paginación: solo llega la primera página
+                    Arreglo: activa Paginación o define un tope ($top)
+         ...4 hallazgos más, cada uno con su arreglo y la fuente oficial
+
+Tú ▸ aplica el arreglo del manejo de errores al flujo real
+
+Agente ▸ [SIMULACIÓN] Edité la definición y la re-auditė: 92/100 ✓
+         Cambio: la lógica queda envuelta en Try/Catch con aviso de error.
+         Antes de tocar el tenant haré un respaldo automático. ¿Confirmas?
+
+Tú ▸ sí
+
+Agente ▸ Flujo actualizado vía Dataverse (la vía soportada por Microsoft).
+         Respaldo guardado. Última ejecución: ÉXITO ✅
+```
+
+Sin `--si` (tu confirmación) nada se ejecuta; una definición con hallazgos
+graves **se niega a subir**. La red de seguridad está en el código, no en la
+buena voluntad del modelo.
 
 ---
 
 ## 🚀 Instalación
 
-**Prerrequisitos:** [Python 3.10+](https://www.python.org/downloads/) y un agente
-de IA con terminal (Claude Code, OpenAI Codex, Gemini CLI u OpenCode).
+**Prerrequisito común:** [Python 3.10+](https://www.python.org/downloads/). Para
+los modos conectados al tenant: `pip install msal msal-extensions requests` y un
+login único (`python scripts/pa_api.py login`).
+
+Elige tu herramienta: [Claude Code](#claude-code) · [Codex](#openai-codex) ·
+[Gemini CLI](#gemini-cli) · [OpenCode](#opencode)
+
+### Claude Code
+
+```text
+/plugin marketplace add JoseAAA/power-automate-architect
+/plugin install power-automate-architect@power-automate-architect-marketplace
+```
+
+### OpenAI Codex
 
 ```bash
 git clone https://github.com/JoseAAA/power-automate-architect.git
-cd power-automate-architect
-pip install msal msal-extensions requests   # solo para el modo conectado
 ```
 
-Abre la carpeta con tu agente y ya está: el proyecto sigue los estándares
-**AGENTS.md** y **Agent Skills**, así que Claude Code, Codex, Gemini CLI y
-OpenCode descubren los modos solos (Claude vía `CLAUDE.md`/plugin; el resto vía
-`AGENTS.md` + `.agents/skills/`).
+Abre la carpeta con Codex: `AGENTS.md` y las skills de `.agents/skills/` se
+autodescubren (estándares AGENTS.md + Agent Skills).
 
-> **Solo quieres auditar un flujo exportado (sin conectarte):** no necesitas
-> instalar nada más — el auditor es 100% offline con la librería estándar.
+### Gemini CLI
 
----
+Igual que Codex: clona y abre la carpeta. `GEMINI.md` y `.agents/skills/` se
+autodescubren.
 
-## ✨ Funciones
+### OpenCode
 
-- 🔍 **Auditor de flujos** — **40 reglas automatizadas** (severidad
-  ALTA/MEDIA/BAJA/INFO) basadas en Microsoft Learn, Well-Architected y el Power
-  CAT Tools Code Review. Cada hallazgo trae su arreglo concreto y la fuente.
-- 🔑 **Un solo login → todos tus flujos** — lista, descarga, audita y diagnostica
-  directo del tenant (login delegado de Microsoft, sin registrar apps).
-- ✍️ **Arregla y crea por lenguaje natural** — "agrégale try/catch a mi flujo" o
-  "crea un flujo que avise cuando…". Con triple red de seguridad: respaldo
-  automático, auditoría previa que bloquea lo malo, y simulación antes de tocar.
-- 🧙 **Copiloto con plantillas 100/100** — alertas programadas, aprobaciones y
-  clasificación con IA, listas para personalizar sin saber JSON.
-- 🤖 **Al día con la IA de Power Automate** — reglas específicas para AI Builder
-  y agent flows (créditos, validación de salidas, humano en el circuito).
-- 🔄 **Vigilante del catálogo** — detecta cambios en la documentación oficial de
-  Microsoft para que las reglas nunca queden viejas.
-- 🧪 **Verificado** — 4 suites de regresión (auditor, conector, docs, consistencia)
-  con coincidencia exacta y cero falsos positivos tolerados.
+Igual que Codex: clona y abre la carpeta (OpenCode lee además `skills/` en
+formato Claude tal cual).
 
 ---
 
-## 💬 Cómo se usa (ejemplos reales)
+## 💬 Qué puedes pedirle (prompts de ejemplo)
 
-Dile a tu asistente, en español:
-
-| Tú dices | El asistente hace |
+| Modo | Escribe en tu agente, por ejemplo |
 |---|---|
-| *"Audita este flujo"* (+ el .zip exportado) | Informe con semáforo 🟢🟡🟠🔴, hallazgos y arreglos |
-| *"Conéctate a Power Automate y lista mis flujos"* | Login de Microsoft (una vez) → tabla de todos tus flujos |
-| *"¿Por qué falló mi flujo de vacaciones?"* | Historial de corridas + causa + arreglo |
-| *"Agrégale manejo de errores"* | Edita el JSON, lo audita, **te muestra el cambio y espera tu OK** antes de subir (con respaldo) |
-| *"Crea un flujo que pida aprobación cuando llegue una solicitud"* | Copiloto: 2-3 preguntas → plantilla 100/100 personalizada → creado (apagado, tú lo enciendes) |
-| *"¿Hay novedades de Power Automate?"* | Chequea las fuentes oficiales y propone actualizar reglas |
+| 🔍 **Auditar** un flujo exportado | *"Audita este flujo: C:\descargas\facturas.zip"* |
+| 🔑 **Ver tus flujos** del tenant | *"Conéctate a Power Automate y dime cuáles de mis flujos fallaron esta semana"* |
+| ✍️ **Corregir** un flujo existente | *"Agrégale manejo de errores a mi flujo de vacaciones y súbelo"* |
+| 🧙 **Crear** un flujo nuevo (copiloto) | *"Créame un flujo que pida aprobación cuando llegue una solicitud a SharePoint"* |
+| 🔄 **Mantener el catálogo al día** | *"¿Hay novedades de Power Automate? Actualiza las reglas si hace falta"* |
+
+El copiloto parte de **plantillas que auditan 100/100** (alertas programadas,
+aprobaciones, clasificación con IA) y hace máximo 2-3 preguntas.
 
 ---
 
-## 🧠 Cómo funciona
+## 🧠 Cómo funciona (y por qué es seguro)
 
-```
- Tú (español) ──► Agente de IA (Claude/Codex/Gemini/OpenCode)
-                       │  lee las skills (qué hacer y cuándo)
-                       ▼
-              scripts/ (Python determinista)
-              ├─ auditar_flujo.py      analizador determinista, 40 reglas (offline)
-              ├─ pa_api.py             conector Microsoft (MSAL, login delegado)
-              └─ actualizar_catalogo.py vigilante de fuentes oficiales
-                       │
-                       ▼
-              APIs de Microsoft (con TU login)   ← nada de terceros
-```
-
-1. El análisis pesado es **determinista en Python** (0 tokens de razonamiento);
-   el asistente solo ejecuta y explica en simple.
-2. La escritura va por la **vía soportada de Microsoft** (Dataverse) con
-   respaldo + auditoría previa + simulación (`--si` para ejecutar de verdad).
-3. Los CLIs tienen salida `--json` con contrato estable
-   (`references/contrato-agente.md`) para que cualquier agente encadene pasos
-   sin raspar texto.
+- **El análisis pesado no lo hace la IA**: es un analizador determinista, 40 reglas
+  en Python puro (también a mano: `python scripts/auditar_flujo.py "flujo.zip"`).
+  El catálogo completo: [references/buenas-practicas.md](references/buenas-practicas.md),
+  con **40 reglas automatizadas** alineadas al Power CAT Tools Code Review de Microsoft.
+- **Local-first**: el auditor es 100% offline; los modos conectados hablan SOLO
+  con APIs de Microsoft usando tu login delegado (MSAL, tokens en caché cifrada).
+  Sin telemetría, sin backend del proyecto.
+- **Escritura con defensa en profundidad**: simulación por defecto, respaldo
+  automático antes de tocar, auditoría previa que bloquea hallazgos graves, y la
+  vía soportada por Microsoft (Dataverse) antes que APIs no soportadas.
+- **Multi-agente por estándares abiertos**: AGENTS.md + Agent Skills; los CLIs
+  tienen salida `--json` con contrato estable para encadenar pasos.
+- Modelo de seguridad completo para TI: [SECURITY.md](SECURITY.md).
 
 ---
 
-## 🔐 Privacidad
+## 📚 Documentación
 
-Pensado para datos sensibles (legal, RR.HH., finanzas). Ver [SECURITY.md](SECURITY.md).
-
-| Acción | ¿Sale a la red? |
-|---|---|
-| Auditar un flujo exportado | ❌ Nunca (100% local) |
-| Listar/leer/modificar tus flujos | ✅ Solo a APIs de Microsoft, con tu propio login |
-| Chequear novedades del catálogo | ✅ Solo metadatos públicos de GitHub |
-| Telemetría, analytics, servidores del proyecto | ❌ No existen |
-
-Tokens en caché local **cifrada** (DPAPI); nunca se muestran ni registran.
-`python scripts/pa_api.py logout` borra la sesión.
-
----
-
-## 🩺 Problemas comunes
-
-| Problema | Solución |
-|---|---|
-| "No hay sesion activa" | `python scripts/pa_api.py login` (abre el navegador; `--device` para código) |
-| "Se necesita aprobación del administrador" al login | Tu tenant exige consentimiento: pide a TI aprobar el client, o usa una app propia con `--client-id` (guía en `references/api-conexion.md`) |
-| `flujos` devuelve 0 | Tu cuenta no es dueña/co-dueña de flujos en ese entorno: revisa `entornos` o pide co-propiedad |
-| Flujo aparece "Suspendido" | Lo bloqueó una política DLP del tenant: revisa qué conector chocó |
-| "La definicion nueva tiene hallazgos ALTA" | Es la red de seguridad: corrige lo señalado (o `--forzar` bajo tu responsabilidad) |
-| Un flujo nuevo no corre | Nace apagado: enlaza las conexiones en el portal y luego `encender <ID> --si` |
-| 429 / throttling | El conector ya reintenta con backoff; espera un momento |
-| Falta `msal` | `pip install msal msal-extensions requests` |
+- **Modos (skills):** [Auditor](skills/pa-auditoria/SKILL.md) ·
+  [Conectado lectura](skills/pa-flujos/SKILL.md) ·
+  [Escritura](skills/pa-conectado/SKILL.md) ·
+  [Copiloto](skills/pa-copiloto/SKILL.md) ·
+  [Actualizador](skills/pa-actualizar/SKILL.md)
+- **Catálogo de reglas PA-XXX:** [buenas-practicas.md](references/buenas-practicas.md) ·
+  backlog: [reglas-candidatas.md](references/reglas-candidatas.md)
+- **IA en Power Automate (créditos, cuándo usarla):** [ia-en-flujos.md](references/ia-en-flujos.md)
+- **Arquitectura de conexión (APIs, login):** [api-conexion.md](references/api-conexion.md)
+- **Contrato JSON para agentes:** [contrato-agente.md](references/contrato-agente.md)
+- **Seguridad:** [SECURITY.md](SECURITY.md) · **Cambios:** [CHANGELOG.md](CHANGELOG.md)
+- **Verificar tras cambios:** `python evals/verificar_auditor.py && python evals/verificar_conector.py && python evals/verificar_docs.py`
 
 ---
 
-## 🧰 Stack
+## 🤝 Contribuir y licencia
 
-| Capa | Tecnología |
-|---|---|
-| Análisis de flujos | Python 3 (stdlib), determinista |
-| Autenticación | MSAL (OAuth delegado de Microsoft) + msal-extensions (caché DPAPI) |
-| APIs | maker API (lectura) · Dataverse Web API (escritura soportada) |
-| Instrucciones del agente | AGENTS.md + Agent Skills (`skills/`, espejo `.agents/skills/`) |
-| Catálogo de reglas | Microsoft Learn · Power Platform Well-Architected · Power CAT Tools |
-| Pruebas | 4 suites en `evals/` (regresión exacta, API simulada, anti-drift) |
-
-Créditos: [Microsoft Learn](https://learn.microsoft.com/power-automate/guidance/coding-guidelines/),
-[Power CAT Tools](https://github.com/microsoft/Power-CAT-Tools), Matthew Devaney,
-Forward Forever, Tom Riha, Pieter Veenstra, David Wyatt.
-
----
-
-## 🗺️ Roadmap
-
-- 📦 Release en GitHub (v1.0) y marketplace de plugins de Claude Code
-- 🧙 Más plantillas del copiloto (documentos con IA, sincronización de listas)
-- 📊 Auditoría masiva: puntuar todos los flujos del tenant de una vez
-- 🌐 Conector remoto auto-hosteado (solo si una empresa lo necesita para web/móvil)
-
-Issues y PRs bienvenidos.
-
----
-
-## 👤 Autor
-
-**JoseAAA** · [github.com/JoseAAA](https://github.com/JoseAAA)
-
-## 📜 Licencia
-
-MIT — ver [LICENSE](LICENSE)
+Issues y PRs bienvenidos (convenciones en [AGENTS.md](AGENTS.md)).
+**JoseAAA** · [github.com/JoseAAA](https://github.com/JoseAAA) · MIT — ver [LICENSE](LICENSE)
