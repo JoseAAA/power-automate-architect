@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.1] — 2026-07-20 · Enrutamiento de preguntas de sesión/cuenta
+
+### Corregido
+- Preguntas como "¿cuántas sesiones tengo?" / "¿a qué cuenta estoy conectado?"
+  no cargaban la skill y el asistente improvisaba (buscaba archivos y decía "no
+  hay sesión" cuando sí la había). La descripción de `pa-flujos` ahora incluye
+  esos disparadores (sesión/cuenta) y el procedimiento instruye correr `sesion`
+  y NO buscar archivos.
+
 ## [1.4.0] — 2026-07-20 · Reporte de salud (conexiones rotas)
 
 ### Agregado — `salud` (idea del fabric-cli de Microsoft)

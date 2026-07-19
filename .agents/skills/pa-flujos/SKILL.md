@@ -2,12 +2,13 @@
 name: pa-flujos
 allowed-tools: Bash(python *)
 description: >
-  Modo conectado de LECTURA (vía 100% Microsoft, sin terceros): un solo login →
-  listar, inspeccionar y auditar TODOS los cloud flows del usuario sin exportar
-  zips. USAR cuando el usuario dice "conéctate a Power Automate", "lista mis
-  flujos", "qué flujos tengo", "audita mi flujo X" (sin adjuntar archivo),
-  "por qué falló mi flujo", "muéstrame las corridas", "descarga la definición",
-  "inicia sesión". NO modifica ni despliega flujos (para eso: pa-conectado).
+  Modo conectado de LECTURA (100% Microsoft, sin terceros): con un login, listar,
+  auditar y revisar la salud de los cloud flows del tenant sin exportar zips, y
+  GESTIONAR CUENTAS/SESIONES. USAR cuando el usuario dice "conéctate a Power
+  Automate", "lista mis flujos", "audita mi flujo X", "por qué falló", "audita
+  todo el tenant", "conexiones rotas / salud", "a qué cuenta estoy conectado",
+  "cuántas sesiones/cuentas tengo", "cambia de cuenta", "cierra/inicia sesión".
+  NO modifica flujos (para eso: pa-conectado).
 ---
 
 # Modo conectado (lectura) — todos los flujos con un solo login
@@ -43,6 +44,12 @@ python "scripts/pa_api.py" salud --detalle salud.json  # conexiones rotas, suspe
 ```
 
 ## Procedimiento
+
+0. **Preguntas de cuenta/sesión** ("¿a qué cuenta estoy conectado?", "¿cuántas
+   sesiones tengo?", "cambia de cuenta", "cierra sesión"): corre el comando
+   correspondiente (`sesion` / `cambiar-cuenta` / `logout`) y responde con su
+   salida. NO busques archivos en el proyecto ni digas "no hay sesión": la
+   verdad la da `python "scripts/pa_api.py" sesion`.
 
 1. **Sesión.** Intenta directamente el comando pedido (ej. `flujos`). Si sale
    `ERROR: No hay sesion activa` (exit 3): el login interactivo NO funciona

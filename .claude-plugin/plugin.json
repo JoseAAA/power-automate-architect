@@ -1,7 +1,7 @@
 {
   "name": "power-automate-architect",
   "displayName": "Power Automate Architect",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Auditor y copiloto experto de Power Automate (cloud flows) por lenguaje natural. Audita flujos contra las mejores practicas oficiales de Microsoft (coding guidelines, Well-Architected, Power CAT) con puntuacion, severidad y arreglo concreto; con un solo login de Microsoft lista, diagnostica, modifica y crea flujos del tenant (respaldo automatico + confirmacion antes de escribir). Local-first: analisis en tu maquina, datos directo a Microsoft, sin terceros. Facil para expertos y no expertos.",
   "author": { "name": "Power Automate Architect contributors" },
   "license": "MIT",
