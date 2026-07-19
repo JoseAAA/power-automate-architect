@@ -239,10 +239,15 @@ def main():
         rechazo = True
     check("cambiar-cuenta rechaza un correo sin sesion", rechazo)
 
-    pa_api.cmd_logout(_Args(todas=False))
-    check("logout cierra la activa y deja la otra como activa",
-          _config.get("cuenta_activa") == "personal@contoso.com" and
-          len(fake.get_accounts()) == 1)
+    # activa = empresa; cerrar una cuenta PUNTUAL (personal, no activa) la quita y respeta la activa
+    pa_api.cmd_logout(_Args(correo="personal@contoso.com", todas=False))
+    check("logout <correo> cierra esa cuenta y respeta la activa",
+          _config.get("cuenta_activa") == "empresa@bigcorp.com" and
+          [c["username"] for c in fake.get_accounts()] == ["empresa@bigcorp.com"])
+    # cerrar la activa (ya sin correo): al no quedar ninguna, se limpia cuenta_activa
+    pa_api.cmd_logout(_Args(correo=None, todas=False))
+    check("logout de la ultima cuenta limpia cuenta_activa",
+          "cuenta_activa" not in _config and not fake.get_accounts())
 
     # 12. auditoria del tenant (agregado token-minimal, sin per-flujo en el resumen)
     import copy

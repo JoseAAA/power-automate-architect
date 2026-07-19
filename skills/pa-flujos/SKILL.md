@@ -53,6 +53,10 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" auditar-todos --detalle informe
      &lt;correo&gt;". Menciónaselo al usuario. Si dice que sus flujos están en OTRA
      cuenta (ej. la de la empresa), usa `login` para agregarla y luego
      `cambiar-cuenta &lt;correo&gt;` (o `sesion` para ver las disponibles).
+   - **Gestionar sesiones:** `sesion` (ver todas), `cambiar-cuenta &lt;correo&gt;`
+     (activar otra), `logout &lt;correo&gt;` (cerrar una puntual), `logout` (la
+     activa), `logout --todas` (todas). Cerrar cuentas que ya no se usan es
+     buena higiene, sobre todo en equipos compartidos.
 2. **Listar.** `flujos` → presenta en lenguaje llano: cuántos hay, cuáles están
    apagados (`Stopped`) y sobre todo cuáles **Suspendido** (= bloqueados por
    política DLP: eso hay que decirlo claro). Ofrece auditar los importantes.

@@ -6,7 +6,7 @@ Uso:
   python pa_api.py login [--device]        Inicia sesion (o agrega otra cuenta)
   python pa_api.py sesion                  A que cuenta(s) estas conectado
   python pa_api.py cambiar-cuenta <correo> Cambia la cuenta activa (ej. la de tu empresa)
-  python pa_api.py logout [--todas]        Cierra la cuenta activa (o todas)
+  python pa_api.py logout [<correo>|--todas]  Cierra la cuenta activa, una puntual, o todas
   python pa_api.py entornos                Lista tus entornos
   python pa_api.py flujos [--entorno ID]   Lista TODOS tus flujos (Mis flujos + soluciones)
   python pa_api.py flujo <flowId> [--guardar ruta.json]   Detalle/definicion de un flujo
@@ -463,8 +463,10 @@ def cmd_sesion(args):
         print(f"  {u}{activa}")
     if len(cuentas) > 1:
         print("\nCambiar de cuenta:  python pa_api.py cambiar-cuenta <correo>")
+        print("Cerrar una cuenta:  python pa_api.py logout <correo>   (o --todas)")
     else:
         print("\nAgregar otra cuenta (ej. la de tu empresa):  python pa_api.py login")
+        print("Cerrar la sesion:   python pa_api.py logout")
     return 0
 
 
@@ -496,20 +498,32 @@ def cmd_logout(args):
         print("Todas las sesiones borradas.")
         return 0
     app = _app(args.client_id, args.tenant)
-    cuenta, _cuentas = _cuenta_activa(app)
-    if not cuenta:
+    cuentas = app.get_accounts()
+    if not cuentas:
         print("No habia sesion local.")
         return 0
+    correo = getattr(args, "correo", None)
+    if correo:  # cerrar una cuenta puntual (aunque no sea la activa)
+        objetivo = [c for c in cuentas if str(c.get("username", "")).lower() == correo.lower()]
+        if not objetivo:
+            disp = ", ".join(c.get("username", "?") for c in cuentas)
+            raise PaApiError(f"No hay sesion para '{correo}'. Cuentas: {disp}")
+        cuenta = objetivo[0]
+    else:  # sin correo: cerrar la activa
+        cuenta, _ = _cuenta_activa(app)
     app.remove_account(cuenta)
     cfg = _cargar_config()
-    cfg.pop("entorno", None)
-    restantes = app.get_accounts()
-    cfg["cuenta_activa"] = restantes[0].get("username") if restantes else None
-    if not restantes:
-        cfg.pop("cuenta_activa", None)
+    era_activa = str(cfg.get("cuenta_activa", "")).lower() == str(cuenta.get("username", "")).lower()
+    if era_activa:  # si cerramos la activa, elegir otra (y olvidar el entorno de esa cuenta)
+        cfg.pop("entorno", None)
+        restantes = app.get_accounts()
+        if restantes:
+            cfg["cuenta_activa"] = restantes[0].get("username")
+        else:
+            cfg.pop("cuenta_activa", None)
     _guardar_config(cfg)
     msg = f"Sesion de {cuenta.get('username')} cerrada."
-    if restantes:
+    if era_activa and cfg.get("cuenta_activa"):
         msg += f" Cuenta activa ahora: {cfg['cuenta_activa']}"
     print(msg)
     return 0
@@ -808,7 +822,8 @@ def main():
     p = sub.add_parser("cambiar-cuenta", help="Cambiar la cuenta activa");       comunes(p)
     p.add_argument("correo", help="correo de una cuenta ya iniciada (ver 'sesion')")
     p.set_defaults(fn=cmd_cambiar_cuenta)
-    p = sub.add_parser("logout", help="Cerrar la cuenta activa (--todas para todas)"); comunes(p)
+    p = sub.add_parser("logout", help="Cerrar la cuenta activa, una puntual (<correo>) o todas"); comunes(p)
+    p.add_argument("correo", nargs="?", help="correo de la cuenta a cerrar (por defecto: la activa)")
     p.add_argument("--todas", action="store_true", help="cerrar TODAS las cuentas")
     p.set_defaults(fn=cmd_logout)
     p = sub.add_parser("entornos", help="Listar entornos");             comunes(p); p.set_defaults(fn=cmd_entornos)

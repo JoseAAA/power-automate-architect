@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.0] — 2026-07-20 · Gestión de sesiones
+
+### Agregado
+- **`logout <correo>`**: cierra una cuenta específica sin tener que cambiarte a
+  ella primero (antes solo se podía cerrar la activa o todas). Si cierras la
+  activa, la sesión pasa a otra cuenta disponible; `logout --todas` sigue
+  borrando todo. `sesion` ahora muestra los comandos para cambiar/cerrar cuentas.
+- Gestión de cuentas completa: `sesion` (ver), `login [--como]` (agregar),
+  `cambiar-cuenta` (activar), `logout [<correo>|--todas]` (cerrar).
+- Prueba offline del cierre puntual y del vaciado de la última cuenta.
+
 ## [1.2.1] — 2026-07-20 · Login a una cuenta específica
 
 ### Agregado
