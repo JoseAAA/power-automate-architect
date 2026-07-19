@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.1] — 2026-07-20 · Login a una cuenta específica
+
+### Agregado
+- `login --como <correo>`: fuerza el login a una cuenta concreta (`login_hint`),
+  útil cuando el navegador tiene sesión única y no muestra el selector. En
+  device code, recuerda "Usar otra cuenta". Avisa si terminas en otra cuenta.
+
+### Nota de uso
+- El login interactivo (navegador) debe correr en la **terminal del usuario**,
+  no dentro del agente: el proceso del agente no tiene navegador ni TTY. Para
+  agentes, `--device` es lo robusto (muestra URL + código que el usuario abre).
+
 ## [1.2.0] — 2026-07-20 · Auditoría de todo el tenant (token-mínima)
 
 ### Agregado — `auditar-todos` (tablero de gobernanza)

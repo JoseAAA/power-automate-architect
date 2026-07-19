@@ -44,9 +44,11 @@ python "scripts/pa_api.py" auditar-todos --detalle informe.json  # tablero del t
 ## Procedimiento
 
 1. **Sesión.** Intenta directamente el comando pedido (ej. `flujos`). Si sale
-   `ERROR: No hay sesion activa` (exit 3), avisa al usuario que se abrirá el
-   navegador para iniciar sesión con su cuenta de trabajo y corre `login`
-   (espera hasta 5 min). Si el navegador no es viable, `login --device`.
+   `ERROR: No hay sesion activa` (exit 3): el login interactivo NO funciona
+   dentro del agente (no hay navegador ni TTY → "no se abrió la página"). Pide
+   al usuario que corra el login **en su propia terminal de PowerShell**, o usa
+   `login --device` (muestra URL + código que el usuario abre a mano). Para una
+   cuenta concreta: `login --device --como <correo>` y "Usar otra cuenta".
    - **Transparencia de cuenta:** `flujos`/`entornos` muestran "conectado como
      &lt;correo&gt;". Menciónaselo al usuario. Si dice que sus flujos están en OTRA
      cuenta (ej. la de la empresa), usa `login` para agregarla y luego

@@ -137,15 +137,18 @@ def _cuenta_activa(app):
     return cuentas[0], cuentas
 
 
-def _token_para(scopes, interactivo=False, device=False, client_id=None, tenant=None):
+def _token_para(scopes, interactivo=False, device=False, client_id=None, tenant=None,
+                hint=None):
     """Token delegado de la cuenta activa: silencioso si hay sesion; si no (y se
-    pide), interactivo. Devuelve (access_token, usuario)."""
+    pide), interactivo. `hint` (correo) fuerza esa cuenta en el login interactivo.
+    Devuelve (access_token, usuario)."""
     app = _app(client_id, tenant)
-    cuenta, _cuentas = _cuenta_activa(app)
-    if cuenta:
-        r = app.acquire_token_silent(scopes, account=cuenta)
-        if r and "access_token" in r:
-            return r["access_token"], cuenta.get("username", "?")
+    if not (interactivo and hint):  # con hint explicito no reuses la cuenta silenciosa
+        cuenta, _cuentas = _cuenta_activa(app)
+        if cuenta:
+            r = app.acquire_token_silent(scopes, account=cuenta)
+            if r and "access_token" in r:
+                return r["access_token"], cuenta.get("username", "?")
     if not interactivo:
         raise PaApiError("No hay sesion activa. Corre primero:  python pa_api.py login")
     if device:
@@ -153,10 +156,14 @@ def _token_para(scopes, interactivo=False, device=False, client_id=None, tenant=
         if "user_code" not in flujo:
             raise PaApiError(f"No se pudo iniciar device flow: {flujo.get('error_description', flujo)}")
         print(flujo["message"])  # instrucciones: ir a microsoft.com/devicelogin con el codigo
+        if hint:
+            print(f"IMPORTANTE: en esa pagina elige 'Usar otra cuenta' e inicia con: {hint}")
         r = app.acquire_token_by_device_flow(flujo)
     else:
-        print("Abriendo el navegador para iniciar sesion con tu cuenta de Microsoft...")
-        r = app.acquire_token_interactive(scopes=scopes, prompt="select_account", timeout=300)
+        destino = f" ({hint})" if hint else ""
+        print(f"Abriendo el navegador para iniciar sesion con tu cuenta de Microsoft{destino}...")
+        r = app.acquire_token_interactive(scopes=scopes, prompt="select_account",
+                                          login_hint=hint, timeout=300)
     if "access_token" not in r:
         err = r.get("error_description") or r.get("error") or str(r)
         if "AADSTS65001" in err or "consent" in err.lower():
@@ -410,7 +417,11 @@ def _fecha(s):
 
 def cmd_login(args):
     token, usuario = _token_para(SCOPE_FLOW, interactivo=True, device=args.device,
-                                 client_id=args.client_id, tenant=args.tenant)
+                                 client_id=args.client_id, tenant=args.tenant,
+                                 hint=getattr(args, "como", None))
+    if getattr(args, "como", None) and str(usuario).lower() != args.como.lower():
+        print(f"AVISO: iniciaste como {usuario}, no como {args.como}. "
+              "Si querias la otra cuenta, corre de nuevo con --device y elige 'Usar otra cuenta'.")
     cfg = _cargar_config()
     if args.client_id:
         cfg["client_id"] = args.client_id
@@ -790,6 +801,7 @@ def main():
 
     p = sub.add_parser("login", help="Iniciar sesion (o agregar otra cuenta)");  comunes(p)
     p.add_argument("--device", action="store_true", help="usar codigo de dispositivo en vez de navegador")
+    p.add_argument("--como", help="correo de la cuenta a iniciar (fuerza esa cuenta, no la del navegador)")
     p.set_defaults(fn=cmd_login)
     p = sub.add_parser("sesion", help="Ver a que cuenta(s) estas conectado");    comunes(p)
     p.set_defaults(fn=cmd_sesion)
