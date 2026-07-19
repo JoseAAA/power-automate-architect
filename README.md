@@ -30,7 +30,6 @@ Agente ▸ PUNTUACIÓN: 55/100 → ACEPTABLE, requiere mejoras
 Tú ▸ aplica el arreglo del manejo de errores al flujo real
 
 Agente ▸ [SIMULACIÓN] Edité la definición y la re-auditė: 92/100 ✓
-         Cambio: la lógica queda envuelta en Try/Catch con aviso de error.
          Antes de tocar el tenant haré un respaldo automático. ¿Confirmas?
 
 Tú ▸ sí
@@ -39,19 +38,16 @@ Agente ▸ Flujo actualizado vía Dataverse (la vía soportada por Microsoft).
          Respaldo guardado. Última ejecución: ÉXITO ✅
 ```
 
-Sin `--si` (tu confirmación) nada se ejecuta; una definición con hallazgos
-graves **se niega a subir**. La red de seguridad está en el código, no en la
-buena voluntad del modelo.
+Sin tu confirmación nada se ejecuta; una definición con hallazgos graves **se
+niega a subir**. La red de seguridad está en el código, no en la buena voluntad
+del modelo.
 
 ---
 
 ## 🚀 Instalación
 
-**Prerrequisito común:** [Python 3.10+](https://www.python.org/downloads/). Para
-los modos conectados al tenant: `pip install msal msal-extensions requests` y un
-login único (`python scripts/pa_api.py login`).
-
-Elige tu herramienta: [Claude Code](#claude-code) · [Codex](#openai-codex) ·
+**Prerrequisito:** [Python 3.10+](https://www.python.org/downloads/). Elige tu
+herramienta: [Claude Code](#claude-code) · [Codex](#openai-codex) ·
 [Gemini CLI](#gemini-cli) · [OpenCode](#opencode)
 
 ### Claude Code
@@ -60,40 +56,97 @@ Elige tu herramienta: [Claude Code](#claude-code) · [Codex](#openai-codex) ·
 /plugin marketplace add JoseAAA/power-automate-architect
 /plugin install power-automate-architect@power-automate-architect-marketplace
 ```
+Para actualizarlo más adelante: `/plugin marketplace update power-automate-architect-marketplace`
+y luego `/plugin update power-automate-architect@power-automate-architect-marketplace`.
 
 ### OpenAI Codex
 
 ```bash
 git clone https://github.com/JoseAAA/power-automate-architect.git
 ```
-
 Abre la carpeta con Codex: `AGENTS.md` y las skills de `.agents/skills/` se
 autodescubren (estándares AGENTS.md + Agent Skills).
 
 ### Gemini CLI
 
-Igual que Codex: clona y abre la carpeta. `GEMINI.md` y `.agents/skills/` se
-autodescubren.
+Igual que Codex: clona y abre la carpeta (`GEMINI.md` + `.agents/skills/`).
 
 ### OpenCode
 
-Igual que Codex: clona y abre la carpeta (OpenCode lee además `skills/` en
-formato Claude tal cual).
+Igual que Codex: clona y abre la carpeta (además lee `skills/` en formato Claude).
+
+---
+
+## 🏁 Primeros pasos
+
+Hay **dos formas de usarlo** según lo que necesites:
+
+### A) Solo auditar un flujo exportado — sin conectarte a nada
+
+No necesita login ni instalar más. En Power Automate: **Mis flujos → ⋯ →
+Exportar → Paquete (.zip)**. Luego dile a tu agente:
+
+> *"audita este flujo: C:\descargas\mi-flujo.zip"*
+
+### B) Conectarte a tu tenant — listar, auditar, corregir y crear flujos
+
+Requiere iniciar sesión **una sola vez**. ⚠️ **Importante:** el login abre el
+navegador, así que **debe correr en TU terminal (PowerShell), no dentro del
+agente** (el agente no tiene navegador — por eso "no se abre la página").
+
+**1.** Instala las dependencias (una vez):
+```powershell
+pip install msal msal-extensions requests
+```
+
+**2.** Inicia sesión en tu propia PowerShell:
+```powershell
+# Claude Code: encuentra el script instalado y hace login
+$pa = (Get-ChildItem "$env:USERPROFILE\.claude\plugins\cache" -Recurse -Filter pa_api.py | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+python $pa login
+# (si clonaste el repo, es más simple:  python scripts/pa_api.py login )
+```
+Se abre el navegador → inicia con tu cuenta de trabajo. Queda guardado en una
+caché cifrada; no lo tendrás que repetir.
+
+**3.** Vuelve a tu agente y habla normal: *"lista mis flujos"*, *"audita todos
+mis flujos"*, *"¿qué flujos están fallando por conexiones rotas?"*…
 
 ---
 
 ## 💬 Qué puedes pedirle (prompts de ejemplo)
 
-| Modo | Escribe en tu agente, por ejemplo |
+| Quiero… | Escríbele a tu agente, por ejemplo |
 |---|---|
 | 🔍 **Auditar** un flujo exportado | *"Audita este flujo: C:\descargas\facturas.zip"* |
-| 🔑 **Ver tus flujos** del tenant | *"Conéctate a Power Automate y dime cuáles de mis flujos fallaron esta semana"* |
-| ✍️ **Corregir** un flujo existente | *"Agrégale manejo de errores a mi flujo de vacaciones y súbelo"* |
-| 🧙 **Crear** un flujo nuevo (copiloto) | *"Créame un flujo que pida aprobación cuando llegue una solicitud a SharePoint"* |
-| 🔄 **Mantener el catálogo al día** | *"¿Hay novedades de Power Automate? Actualiza las reglas si hace falta"* |
+| 🔑 **Ver mis flujos** del tenant | *"Lista mis flujos de Power Automate"* |
+| 📊 **Revisar TODO el tenant** | *"Audita todos mis flujos y dame el panorama"* |
+| 🩺 **Salud / conexiones rotas** | *"¿Qué flujos están fallando por conexiones desconectadas?"* |
+| 🧭 **Por qué falló** un flujo | *"¿Por qué falló mi flujo de vacaciones esta semana?"* |
+| ✍️ **Corregir** un flujo | *"Agrégale manejo de errores a mi flujo de vacaciones y súbelo"* |
+| 🧙 **Crear** un flujo nuevo | *"Créame un flujo que pida aprobación cuando llegue una solicitud a SharePoint"* |
+| 👥 **Ver/cambiar cuenta** | *"¿A qué cuenta estoy conectado?"* · *"Conéctate con mi cuenta de la empresa"* |
+| 🔄 **Catálogo al día** | *"¿Hay novedades de Power Automate? Actualiza las reglas si hace falta"* |
 
-El copiloto parte de **plantillas que auditan 100/100** (alertas programadas,
-aprobaciones, clasificación con IA) y hace máximo 2-3 preguntas.
+El copiloto (crear) parte de **plantillas que auditan 100/100** y hace máximo
+2-3 preguntas. Las auditorías del tenant devuelven un **resumen compacto** (el
+detalle va a un archivo), así que auditar 1 o 500 flujos cuesta casi lo mismo.
+
+---
+
+## 👥 Varias cuentas (personal / empresa)
+
+Si tus flujos de trabajo están en otra cuenta, puedes tener varias e ir
+cambiando. Estos comandos van en **tu terminal** (el login abre navegador):
+
+| Acción | Comando |
+|---|---|
+| Ver a qué cuentas estás conectado | `python $pa sesion` |
+| Agregar otra cuenta | `python $pa login` (o `login --device --como correo@empresa.com`) |
+| Cambiar la cuenta activa | `python $pa cambiar-cuenta correo@empresa.com` |
+| Cerrar una cuenta / todas | `python $pa logout correo@empresa.com` · `logout --todas` |
+
+Ya conectado, al agente le basta: *"usa mi cuenta correo@empresa.com"*.
 
 ---
 
@@ -109,9 +162,21 @@ aprobaciones, clasificación con IA) y hace máximo 2-3 preguntas.
 - **Escritura con defensa en profundidad**: simulación por defecto, respaldo
   automático antes de tocar, auditoría previa que bloquea hallazgos graves, y la
   vía soportada por Microsoft (Dataverse) antes que APIs no soportadas.
-- **Multi-agente por estándares abiertos**: AGENTS.md + Agent Skills; los CLIs
-  tienen salida `--json` con contrato estable para encadenar pasos.
 - Modelo de seguridad completo para TI: [SECURITY.md](SECURITY.md).
+
+---
+
+## 🩺 Problemas comunes
+
+| Problema | Solución |
+|---|---|
+| **"No se abrió la página" al iniciar sesión** | El login debe correr en **tu** terminal, no dentro del agente. Usa el paso B de arriba, o `login --device` (te da un código para abrir a mano). |
+| **Dice que no hay sesión / no ve mis flujos** | Inicia sesión (paso B). Verifica con `python $pa sesion`. |
+| **"Se necesita aprobación del administrador"** | Tu tenant exige consentimiento: pídelo a TI, o usa una app propia con `--client-id` (ver [api-conexion.md](references/api-conexion.md)). |
+| **El agente no toma la última versión** | Actualiza el plugin: `/plugin marketplace update …` → `/plugin update …`. |
+| **Errores `jq: command not found`** | **No son de este plugin** — son de otro plugin tuyo (`claude-code-warp`). Instala `jq` (`winget install jqlang.jq`) o desactiva ese plugin. |
+| **Un flujo aparece "Suspendido"** | Lo bloqueó una política DLP del tenant; el reporte de salud te dice cuál. |
+| **Una conexión dice "Error"** | Se desconectó/caducó: reconéctala en make.powerautomate.com → Conexiones, y reactiva el flujo. |
 
 ---
 
@@ -122,13 +187,10 @@ aprobaciones, clasificación con IA) y hace máximo 2-3 preguntas.
   [Escritura](skills/pa-conectado/SKILL.md) ·
   [Copiloto](skills/pa-copiloto/SKILL.md) ·
   [Actualizador](skills/pa-actualizar/SKILL.md)
-- **Catálogo de reglas PA-XXX:** [buenas-practicas.md](references/buenas-practicas.md) ·
-  backlog: [reglas-candidatas.md](references/reglas-candidatas.md)
+- **Catálogo de reglas PA-XXX:** [buenas-practicas.md](references/buenas-practicas.md)
 - **IA en Power Automate (créditos, cuándo usarla):** [ia-en-flujos.md](references/ia-en-flujos.md)
-- **Arquitectura de conexión (APIs, login):** [api-conexion.md](references/api-conexion.md)
-- **Contrato JSON para agentes:** [contrato-agente.md](references/contrato-agente.md)
+- **Arquitectura de conexión (APIs, login, cuentas):** [api-conexion.md](references/api-conexion.md)
 - **Seguridad:** [SECURITY.md](SECURITY.md) · **Cambios:** [CHANGELOG.md](CHANGELOG.md)
-- **Verificar tras cambios:** `python evals/verificar_auditor.py && python evals/verificar_conector.py && python evals/verificar_docs.py`
 
 ---
 
