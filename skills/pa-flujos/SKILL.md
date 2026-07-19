@@ -39,6 +39,7 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" flujo <ID> --guardar flujo.json
 python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" corridas <ID>
 python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" auditar <ID>     # descarga + auditoría local
 python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" auditar-todos --detalle informe.json  # tablero del tenant
+python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" salud --detalle salud.json  # conexiones rotas, suspendidos
 ```
 
 ## Procedimiento
@@ -73,6 +74,13 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" auditar-todos --detalle informe
    `--detalle`**: es el detalle por flujo y solo se abre si el usuario pide uno
    concreto (o audita ese flujo con `auditar <ID>`). Así el costo en tokens es
    mínimo sin importar el tamaño del tenant.
+6. **Salud del tenant** ("¿qué flujos están fallando?", "¿alguna conexión se
+   desconectó?", "revisa la salud"): `salud --detalle salud.json`. Cruza flujos
+   × conexiones y reporta: conexiones rotas/caducadas, flujos afectados por
+   ellas (fallan o van a fallar), flujos suspendidos por DLP, y encendidos/
+   apagados. Mismo principio token-mínimo: presenta el resumen impreso, NO leas
+   el `--detalle` salvo que se pida. El arreglo típico de una conexión rota:
+   reconectarla en make.powerautomate.com → Conexiones, y reactivar el flujo.
 
 ## Errores comunes y qué hacer
 - **"Se necesita aprobación del administrador" al hacer login:** el tenant exige

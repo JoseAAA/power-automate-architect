@@ -84,6 +84,26 @@ tabla `workflow`. Cierre del hueco:
 2. Migración masiva: `Add-AdminFlowsToSolution` (módulo PowerShell ≥ 2.0.167) o replicar su llamada — acción "moderniza tus flujos" de la herramienta.
 3. Mientras tanto, la maker API los lee/edita igual que lo hace el portal.
 
+## Conexiones (para el reporte de salud) — verificado en vivo 2026-07-20
+
+Las conexiones NO viven en el servicio de flujos (probado: `api.flow.microsoft.com/.../connections`
+da 404). Viven en PowerApps y requieren su propio token:
+
+- **Endpoint (verificado, HTTP 200):**
+  `GET https://api.powerapps.com/providers/Microsoft.PowerApps/connections?api-version=2016-11-01&$filter=environment eq '{envId}'`
+- **Token:** scope `https://service.powerapps.com//.default` — se obtiene
+  silencioso con el MISMO login (client first-party FOCI), sin re-login.
+- **Estado de la conexión:** `properties.statuses[*].status` — array; `Connected`
+  = sana; cualquier otro (`Error`) = rota/desconectada/caducada. Un `error.message`
+  string distingue la causa (token caducado a 90 días, contraseña cambiada,
+  cuenta deshabilitada) pero NO hay campo estructurado fiable para eso.
+- **Cruce flujo → conexión (verificado):** la lista de flujos ya trae
+  `properties.connectionReferences` inline (0 llamadas extra); la clave de unión
+  es `connectionReferences[*].connectionName == connection.name`.
+- **Costo:** 2 llamadas por entorno (flujos + conexiones) + cruce en memoria.
+- Flujos suspendidos por DLP: `properties.state == "Suspended"` +
+  `flowSuspensionReason` (gratis en la lista de flujos).
+
 ## Otras piezas evaluadas
 
 - **pac CLI (jul-2026): sigue SIN comandos de flujos.** Solo round-trip por solución (`pac solution export/unpack/pack/import`). Útil para versionar en git, no como vía primaria.

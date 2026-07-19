@@ -275,6 +275,34 @@ def main():
     check("tenant: el resumen expone 'peores' pero el detalle va aparte",
           "peores" in ag and "resultados" in ag)
 
+    # 13. reporte de salud: cruce flujos x conexiones + estados
+    pa_api.listar_flujos = lambda t, e: [
+        {"name": "fa", "properties": {"displayName": "Usa SharePoint roto", "state": "Started",
+            "connectionReferences": {"shared_sharepointonline": {"connectionName": "conn-sp"}}}},
+        {"name": "fb", "properties": {"displayName": "Suspendido", "state": "Suspended",
+            "flowSuspensionReason": "CompanyDlpViolation", "connectionReferences": {}}},
+        {"name": "fc", "properties": {"displayName": "Sano", "state": "Started",
+            "connectionReferences": {"shared_office365": {"connectionName": "conn-o365"}}}},
+    ]
+    pa_api.listar_conexiones = lambda t, e: [
+        {"name": "conn-sp", "properties": {"displayName": "SharePoint",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+            "statuses": [{"status": "Error"}]}},
+        {"name": "conn-o365", "properties": {"displayName": "Office 365",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365",
+            "statuses": [{"status": "Connected"}]}},
+    ]
+    salud = pa_api.reporte_salud("tf", "tp", "env")
+    check("salud: detecta 1 conexion rota", salud["conexiones_rotas_total"] == 1)
+    check("salud: el flujo que usa la conexion rota queda como afectado",
+          any(a["nombre"] == "Usa SharePoint roto" for a in salud["afectados"]))
+    check("salud: el flujo sano NO aparece como afectado",
+          not any(a["nombre"] == "Sano" for a in salud["afectados"]))
+    check("salud: detecta el flujo suspendido (DLP)",
+          salud["suspendidos_total"] == 1 and salud["suspendidos"][0]["motivo"] == "CompanyDlpViolation")
+    check("salud: reparto de estados correcto",
+          salud["estados"]["Started"] == 2 and salud["estados"]["Suspended"] == 1)
+
     print("-" * 50)
     print("TODO OK" if not fallas else f"{len(fallas)} verificacion(es) fallida(s)")
     return 0 if not fallas else 1

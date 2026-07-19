@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.4.0] — 2026-07-20 · Reporte de salud (conexiones rotas)
+
+### Agregado — `salud` (idea del fabric-cli de Microsoft)
+- Nuevo comando `pa_api.py salud [--detalle f.json] [--json]`: detecta flujos
+  que fallan o van a fallar porque su **conexión** (SharePoint, Outlook, SQL…)
+  se **desconectó o caducó**. Cruza flujos × conexiones y reporta: conexiones
+  rotas, flujos afectados por ellas, flujos suspendidos por DLP, y encendidos/
+  apagados. Contrato `pa-architect/salud@1`.
+- **API verificada en vivo** (no inventada): las conexiones viven en
+  `api.powerapps.com/.../connections` (el host de flujos da 404) con token de
+  PowerApps obtenido silencioso del mismo login; estado en
+  `properties.statuses[*].status` (`Connected` vs `Error`); unión flujo↔conexión
+  por `connectionReferences[*].connectionName == connection.name` (la lista de
+  flujos ya trae las referencias inline → 2 llamadas por entorno, sin N GETs).
+  Documentado en `references/api-conexion.md`.
+- **Token-mínimo**: resumen compacto al asistente, detalle a `--detalle`.
+  Probado en vivo (detectó una conexión real en `Error`) y offline
+  (`evals/verificar_conector.py`: cruce, afectados, suspendidos, estados).
+
 ## [1.3.0] — 2026-07-20 · Gestión de sesiones
 
 ### Agregado

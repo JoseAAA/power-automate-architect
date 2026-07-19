@@ -13,6 +13,7 @@ Uso:
   python pa_api.py corridas <flowId>       Historial de ejecuciones
   python pa_api.py auditar <flowId>        Descarga el flujo y corre el auditor local
   python pa_api.py auditar-todos [--detalle f.json]  Audita TODO el tenant (resumen)
+  python pa_api.py salud [--detalle f.json]  Conexiones rotas, flujos afectados, suspendidos
   python pa_api.py actualizar <flowId> --archivo f.json --si   Modifica un flujo (con respaldo)
   python pa_api.py crear --archivo f.json --nombre "X" --si    Crea un flujo (nace apagado)
   python pa_api.py encender <flowId> --si  Activa un flujo
@@ -66,7 +67,9 @@ TENANT_DEFAULT = "organizations"
 SCOPE_FLOW = ["https://service.flow.microsoft.com//.default"]
 
 API_FLOW = "https://api.flow.microsoft.com"
+API_POWERAPPS = "https://api.powerapps.com"
 APIVER = "2016-11-01"
+SCOPE_POWERAPPS = ["https://service.powerapps.com//.default"]  # conexiones viven aqui, no en el servicio de flujos
 
 DIR_CONFIG = Path.home() / ".power-automate-architect"
 ARCHIVO_CACHE = DIR_CONFIG / "token_cache.bin"
@@ -695,6 +698,124 @@ def auditar_tenant(token, entorno, progreso=False):
     }
 
 
+def listar_conexiones(token_pa, entorno):
+    """Conexiones del entorno (via api.powerapps.com; requiere token de PowerApps)."""
+    url = (f"{API_POWERAPPS}/providers/Microsoft.PowerApps/connections"
+           f"?api-version={APIVER}&$filter=environment eq '{entorno}'")
+    return _get_paginado(url, token_pa)
+
+
+def _conexion_rota(props):
+    """True si algun status de la conexion no es 'Connected' (desconectada/caducada/error)."""
+    sts = props.get("statuses") or []
+    return bool(sts) and any(str(s.get("status", "")).lower() != "connected" for s in sts)
+
+
+def reporte_salud(token_flow, token_pa, entorno):
+    """Cruza flujos x conexiones + estados. Detecta flujos que fallan/fallaran por
+    una conexion rota, flujos suspendidos por DLP, y el reparto de estados.
+    Todo en Python (0 tokens de IA). 2 llamadas de red: 1 flujos + 1 conexiones."""
+    flujos = listar_flujos(token_flow, entorno)
+    conexiones = listar_conexiones(token_pa, entorno)
+
+    por_name, rotas = {}, []
+    for c in conexiones:
+        p = c.get("properties", {}) or {}
+        info = {"name": c.get("name"),
+                "conector": str(p.get("apiId", "")).split("/")[-1] or "?",
+                "nombre": p.get("displayName", "?"),
+                "estado": ", ".join(s.get("status", "?") for s in (p.get("statuses") or [])) or "?",
+                "rota": _conexion_rota(p)}
+        por_name[c.get("name")] = info
+        if info["rota"]:
+            rotas.append(info)
+
+    estados = {"Started": 0, "Stopped": 0, "Suspended": 0, "Otro": 0}
+    suspendidos, afectados = [], []
+    for f in flujos:
+        p = f.get("properties", {}) or {}
+        st = p.get("state", "?")
+        estados[st if st in estados else "Otro"] += 1
+        if st == "Suspended":
+            suspendidos.append({"id": f.get("name"), "nombre": p.get("displayName", "?"),
+                                "motivo": p.get("flowSuspensionReason", "?")})
+        cr = p.get("connectionReferences") or {}
+        conx_rotas = sorted({por_name[ref.get("connectionName")]["nombre"]
+                             for ref in (cr.values() if isinstance(cr, dict) else [])
+                             if por_name.get(ref.get("connectionName"), {}).get("rota")})
+        if conx_rotas:
+            afectados.append({"id": f.get("name"), "nombre": p.get("displayName", "?"),
+                              "estado": st, "conexiones_rotas": conx_rotas})
+
+    return {
+        "contrato": "pa-architect/salud@1", "entorno": entorno,
+        "flujos": len(flujos), "conexiones": len(conexiones),
+        "estados": estados,
+        "conexiones_rotas_total": len(rotas),
+        "conexiones_rotas": rotas,
+        "afectados_total": len(afectados),
+        "afectados": afectados,
+        "suspendidos_total": len(suspendidos),
+        "suspendidos": suspendidos,
+    }
+
+
+def cmd_salud(args):
+    token, usuario = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
+    entorno = args.entorno or entorno_por_defecto(token)
+    try:
+        token_pa, _ = _token_para(SCOPE_POWERAPPS, client_id=args.client_id, tenant=args.tenant)
+    except PaApiError:
+        raise PaApiError("No pude obtener acceso a las conexiones (PowerApps). "
+                         "Cierra e inicia sesion de nuevo:  python pa_api.py login")
+    rep = reporte_salud(token, token_pa, entorno)
+
+    detalle = None
+    if args.detalle:
+        Path(args.detalle).write_text(json.dumps(
+            {k: rep[k] for k in ("conexiones_rotas", "afectados", "suspendidos")},
+            ensure_ascii=False, indent=1), encoding="utf-8")
+        detalle = str(Path(args.detalle))
+
+    if args.como_json:
+        # escalares + conexiones rotas (suele ser corto) + afectados/suspendidos acotados
+        resumen = {k: v for k, v in rep.items() if not isinstance(v, list)}
+        resumen["usuario"] = usuario
+        resumen["conexiones_rotas"] = rep["conexiones_rotas"]
+        resumen["afectados"] = rep["afectados"][:15]
+        resumen["suspendidos"] = rep["suspendidos"][:15]
+        if detalle:
+            resumen["detalle_archivo"] = detalle
+        print(json.dumps(resumen, ensure_ascii=False, indent=1))
+        return 0
+
+    e = rep["estados"]
+    print(f"SALUD DEL TENANT — entorno {entorno}  (conectado como {usuario})")
+    print(f"Flujos: {rep['flujos']}  (🟢 encendidos: {e['Started']}   ⚪ apagados: {e['Stopped']}"
+          f"   🚫 suspendidos: {e['Suspended']})   |   Conexiones: {rep['conexiones']}")
+
+    if rep["conexiones_rotas"]:
+        print(f"\n🔴 Conexiones rotas/desconectadas: {rep['conexiones_rotas_total']}")
+        for c in rep["conexiones_rotas"][:20]:
+            print(f"  - {c['nombre'][:40]:<40} {c['conector']:<26} [{c['estado']}]")
+        print(f"\n⚠️  Flujos afectados (fallan o fallaran por esas conexiones): {rep['afectados_total']}")
+        for a in rep["afectados"][:15]:
+            print(f"  - {a['nombre'][:44]:<44} ({a['estado']})  usa: {', '.join(a['conexiones_rotas'])}")
+        print("\n  Arreglo: reconecta esas conexiones en make.powerautomate.com > Conexiones "
+              "(o Datos > Conexiones), luego reactiva el flujo si quedo apagado.")
+    else:
+        print("\n🟢 Ninguna conexion rota. Todas responden 'Connected'.")
+
+    if rep["suspendidos"]:
+        print(f"\n🚫 Flujos suspendidos (normalmente por politica DLP): {rep['suspendidos_total']}")
+        for s in rep["suspendidos"][:15]:
+            print(f"  - {s['nombre'][:44]:<44} motivo: {s['motivo']}")
+
+    if detalle:
+        print(f"\nDetalle completo: {detalle}  (no lo cargues salvo que se pida)")
+    return 0
+
+
 def cmd_auditar_todos(args):
     token, usuario = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
     entorno = args.entorno or entorno_por_defecto(token)
@@ -844,6 +965,11 @@ def main():
     p.add_argument("--detalle", help="ruta .json donde guardar el detalle por flujo")
     p.add_argument("--json", action="store_true", dest="como_json", help="salida estructurada (contrato estable)")
     p.set_defaults(fn=cmd_auditar_todos)
+    p = sub.add_parser("salud", help="Reporte de salud: conexiones rotas, flujos afectados, suspendidos")
+    comunes(p)
+    p.add_argument("--detalle", help="ruta .json donde guardar el detalle")
+    p.add_argument("--json", action="store_true", dest="como_json", help="salida estructurada (contrato estable)")
+    p.set_defaults(fn=cmd_salud)
 
     def escritura(p):
         comunes(p)
