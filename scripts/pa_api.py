@@ -3,7 +3,9 @@
 pa_api.py - Conector local a Power Automate: UN login -> todos tus flujos.
 
 Uso:
-  python pa_api.py login [--device]        Inicia sesion (o agrega otra cuenta)
+  python pa_api.py login                   Inicia sesion por navegador (en TU terminal)
+  python pa_api.py login --iniciar         [agente] paso 1: muestra URL+codigo (no bloquea)
+  python pa_api.py login --completar       [agente] paso 2: espera a que ingreses el codigo
   python pa_api.py sesion                  A que cuenta(s) estas conectado
   python pa_api.py cambiar-cuenta <correo> Cambia la cuenta activa (ej. la de tu empresa)
   python pa_api.py logout [<correo>|--todas]  Cierra la cuenta activa, una puntual, o todas
@@ -74,6 +76,7 @@ SCOPE_POWERAPPS = ["https://service.powerapps.com//.default"]  # conexiones vive
 DIR_CONFIG = Path.home() / ".power-automate-architect"
 ARCHIVO_CACHE = DIR_CONFIG / "token_cache.bin"
 ARCHIVO_CONFIG = DIR_CONFIG / "config.json"
+ARCHIVO_DEVICE = DIR_CONFIG / ".device_flow.json"  # login por codigo en 2 pasos (agente)
 
 AUDITOR = Path(__file__).resolve().parent / "auditar_flujo.py"
 
@@ -418,21 +421,15 @@ def _fecha(s):
     return (s or "")[:19].replace("T", " ")
 
 
-def cmd_login(args):
-    token, usuario = _token_para(SCOPE_FLOW, interactivo=True, device=args.device,
-                                 client_id=args.client_id, tenant=args.tenant,
-                                 hint=getattr(args, "como", None))
-    if getattr(args, "como", None) and str(usuario).lower() != args.como.lower():
-        print(f"AVISO: iniciaste como {usuario}, no como {args.como}. "
-              "Si querias la otra cuenta, corre de nuevo con --device y elige 'Usar otra cuenta'.")
+def _post_login(token, usuario, args):
+    """Comun tras un login exitoso (navegador o device): fija cuenta/entorno e informa."""
     cfg = _cargar_config()
     if args.client_id:
         cfg["client_id"] = args.client_id
     if args.tenant:
         cfg["tenant"] = args.tenant
-    # si cambia la cuenta activa, olvidar el entorno cacheado (puede ser de otro tenant)
     if str(cfg.get("cuenta_activa", "")).lower() != str(usuario).lower():
-        cfg.pop("entorno", None)
+        cfg.pop("entorno", None)  # cuenta nueva: puede ser otro tenant
     cfg["cuenta_activa"] = usuario
     _guardar_config(cfg)
     entornos = listar_entornos(token)
@@ -447,10 +444,45 @@ def cmd_login(args):
     otras = [c.get("username") for c in _app(args.client_id, args.tenant).get_accounts()
              if str(c.get("username", "")).lower() != str(usuario).lower()]
     if otras:
-        print(f"Otras cuentas en sesion: {', '.join(otras)}   "
-              "(cambia con: python pa_api.py cambiar-cuenta <correo>)")
-    print("Siguiente paso:  python pa_api.py flujos")
+        print(f"Otras cuentas en sesion: {', '.join(otras)}")
     return 0
+
+
+def cmd_login(args):
+    # --- login por codigo en 2 pasos (para agentes: sin navegador, relevando el codigo) ---
+    if getattr(args, "iniciar", False):
+        app = _app(args.client_id, args.tenant)
+        flujo = app.initiate_device_flow(scopes=SCOPE_FLOW)
+        if "user_code" not in flujo:
+            raise PaApiError(f"No se pudo iniciar el login: {flujo.get('error_description', flujo)}")
+        DIR_CONFIG.mkdir(parents=True, exist_ok=True)
+        ARCHIVO_DEVICE.write_text(json.dumps(flujo), encoding="utf-8")
+        print(f"Para iniciar sesion, abre:  {flujo.get('verification_uri', 'https://microsoft.com/devicelogin')}")
+        print(f"E ingresa el codigo:  {flujo['user_code']}")
+        if getattr(args, "como", None):
+            print(f"Elige 'Usar otra cuenta' e inicia con: {args.como}")
+        print("Cuando lo hayas hecho, completa con:  python pa_api.py login --completar")
+        return 0
+    if getattr(args, "completar", False):
+        if not ARCHIVO_DEVICE.exists():
+            raise PaApiError("No hay un login en curso. Inicia con:  python pa_api.py login --iniciar")
+        flujo = json.loads(ARCHIVO_DEVICE.read_text(encoding="utf-8"))
+        app = _app(args.client_id, args.tenant)
+        r = app.acquire_token_by_device_flow(flujo)  # bloquea hasta que el usuario complete o expire
+        ARCHIVO_DEVICE.unlink(missing_ok=True)
+        if "access_token" not in r:
+            err = r.get("error_description") or r.get("error") or str(r)
+            raise PaApiError(f"Login no completado (¿ingresaste el codigo?): {err[:200]}")
+        usuario = (r.get("id_token_claims") or {}).get("preferred_username") or "?"
+        return _post_login(r["access_token"], usuario, args)
+
+    # --- login por navegador (requiere terminal del usuario) ---
+    token, usuario = _token_para(SCOPE_FLOW, interactivo=True, device=args.device,
+                                 client_id=args.client_id, tenant=args.tenant,
+                                 hint=getattr(args, "como", None))
+    if getattr(args, "como", None) and str(usuario).lower() != args.como.lower():
+        print(f"AVISO: iniciaste como {usuario}, no como {args.como}.")
+    return _post_login(token, usuario, args)
 
 
 def cmd_sesion(args):
@@ -936,6 +968,8 @@ def main():
 
     p = sub.add_parser("login", help="Iniciar sesion (o agregar otra cuenta)");  comunes(p)
     p.add_argument("--device", action="store_true", help="usar codigo de dispositivo en vez de navegador")
+    p.add_argument("--iniciar", action="store_true", help="[agente] paso 1: muestra URL+codigo y no bloquea")
+    p.add_argument("--completar", action="store_true", help="[agente] paso 2: espera a que completes el codigo")
     p.add_argument("--como", help="correo de la cuenta a iniciar (fuerza esa cuenta, no la del navegador)")
     p.set_defaults(fn=cmd_login)
     p = sub.add_parser("sesion", help="Ver a que cuenta(s) estas conectado");    comunes(p)

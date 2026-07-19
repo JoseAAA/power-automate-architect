@@ -45,26 +45,26 @@ python "scripts/pa_api.py" salud --detalle salud.json  # conexiones rotas, suspe
 
 ## Procedimiento
 
-0. **Preguntas de cuenta/sesión** ("¿a qué cuenta estoy conectado?", "¿cuántas
-   sesiones tengo?", "cambia de cuenta", "cierra sesión"): corre el comando
-   correspondiente (`sesion` / `cambiar-cuenta` / `logout`) y responde con su
-   salida. NO busques archivos en el proyecto ni digas "no hay sesión": la
-   verdad la da `python "scripts/pa_api.py" sesion`.
+0. **Gestión de cuentas POR LENGUAJE NATURAL (tú corres los comandos, no el usuario).**
+   - *Ver / cambiar / cerrar* NO necesitan navegador: córrelos directamente y
+     responde con su salida. NUNCA busques archivos ni digas "no hay sesión": la
+     verdad la da `sesion`.
+     - "¿a qué cuenta estoy?" / "¿cuántas sesiones tengo?" → `sesion`
+     - "usa mi cuenta X" / "cambia de cuenta" → `cambiar-cuenta &lt;correo&gt;`
+     - "cierra la sesión de X" / "cierra todas" → `logout &lt;correo&gt;` / `logout --todas`
+   - *Iniciar sesión / agregar una cuenta* SÍ necesita el navegador del usuario,
+     pero lo manejas en 2 pasos SIN pedirle terminal:
+     1. Corre `login --iniciar` (para una cuenta puntual: `login --iniciar --como <correo>`).
+        Devuelve al instante una URL y un CÓDIGO. **Muéstraselos al usuario tal
+        cual** y dile que abra la URL, ingrese el código e inicie con su cuenta
+        (si es otra cuenta, "Usar otra cuenta").
+     2. Cuando el usuario diga que ya lo hizo, corre `login --completar` con un
+        **timeout largo (hasta 10 min)**; devuelve "Sesion iniciada como &lt;correo&gt;".
+   - **Transparencia:** `flujos`/`entornos` muestran "conectado como &lt;correo&gt;".
+     Menciónaselo. Si sus flujos están en otra cuenta, ofrece agregarla (arriba).
 
-1. **Sesión.** Intenta directamente el comando pedido (ej. `flujos`). Si sale
-   `ERROR: No hay sesion activa` (exit 3): el login interactivo NO funciona
-   dentro del agente (no hay navegador ni TTY → "no se abrió la página"). Pide
-   al usuario que corra el login **en su propia terminal de PowerShell**, o usa
-   `login --device` (muestra URL + código que el usuario abre a mano). Para una
-   cuenta concreta: `login --device --como <correo>` y "Usar otra cuenta".
-   - **Transparencia de cuenta:** `flujos`/`entornos` muestran "conectado como
-     &lt;correo&gt;". Menciónaselo al usuario. Si dice que sus flujos están en OTRA
-     cuenta (ej. la de la empresa), usa `login` para agregarla y luego
-     `cambiar-cuenta &lt;correo&gt;` (o `sesion` para ver las disponibles).
-   - **Gestionar sesiones:** `sesion` (ver todas), `cambiar-cuenta &lt;correo&gt;`
-     (activar otra), `logout &lt;correo&gt;` (cerrar una puntual), `logout` (la
-     activa), `logout --todas` (todas). Cerrar cuentas que ya no se usan es
-     buena higiene, sobre todo en equipos compartidos.
+1. **Al correr un comando de flujos**, si sale `ERROR: No hay sesion activa`
+   (exit 3), inicia el login en 2 pasos del punto 0 (no pidas terminal).
 2. **Listar.** `flujos` → presenta en lenguaje llano: cuántos hay, cuáles están
    apagados (`Stopped`) y sobre todo cuáles **Suspendido** (= bloqueados por
    política DLP: eso hay que decirlo claro). Ofrece auditar los importantes.

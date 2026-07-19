@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.0] — 2026-07-20 · Sesiones por lenguaje natural
+
+### Agregado — login en 2 pasos (lo maneja el agente, sin terminal)
+- `login --iniciar` muestra al instante la URL + código y **no bloquea** (guarda
+  el estado en `~/.power-automate-architect/.device_flow.json`); `login
+  --completar` espera a que el usuario ingrese el código y confirma la sesión.
+  Así el agente puede iniciar sesión **por lenguaje natural**: relaya el código
+  y completa, sin pedirle al usuario que abra una terminal. `login` por navegador
+  sigue disponible para la terminal.
+- La skill `pa-flujos` instruye la gestión completa de cuentas por lenguaje
+  natural: el agente corre `sesion` / `cambiar-cuenta` / `logout` directamente y
+  usa el login en 2 pasos para agregar cuentas.
+
+### Cambiado
+- README: cuentas y sesiones presentadas como lenguaje natural (*"conéctate con
+  mi cuenta de la empresa"*, *"¿a qué cuenta estoy conectado?"*), con la terminal
+  como alternativa; "Problemas comunes" actualizado.
+
 ## [1.4.1] — 2026-07-20 · Enrutamiento de preguntas de sesión/cuenta
 
 ### Corregido

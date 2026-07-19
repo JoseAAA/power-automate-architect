@@ -49,6 +49,10 @@ python "scripts/pa_api.py" flujo <ID> --guardar flujo.json
    `python "scripts/pa_api.py" actualizar <ID> --archivo flujo.json --si`
 4. Valida con `corridas <ID>` y reporta en simple (+ ruta del respaldo).
 
+## Encender / apagar un flujo
+"enciéndelo" / "actívalo" → `pa_api.py encender <ID> --si`.
+"apágalo" / "desactívalo" → `pa_api.py apagar <ID> --si`. Sin `--si` solo simula.
+
 ## Crear flujos nuevos
 Eso es de la skill `pa-copiloto` (plantillas 100/100 + creación guiada); este
 modo solo modifica, enciende/apaga y restaura respaldos.

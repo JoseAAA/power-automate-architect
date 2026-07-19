@@ -90,27 +90,21 @@ Exportar → Paquete (.zip)**. Luego dile a tu agente:
 
 ### B) Conectarte a tu tenant — listar, auditar, corregir y crear flujos
 
-Requiere iniciar sesión **una sola vez**. ⚠️ **Importante:** el login abre el
-navegador, así que **debe correr en TU terminal (PowerShell), no dentro del
-agente** (el agente no tiene navegador — por eso "no se abre la página").
+Requiere iniciar sesión **una sola vez**, y se hace **hablándole al agente** — no
+tienes que tocar la terminal:
 
-**1.** Instala las dependencias (una vez):
-```powershell
-pip install msal msal-extensions requests
-```
+**1.** Instala las dependencias (una vez): `pip install msal msal-extensions requests`
 
-**2.** Inicia sesión en tu propia PowerShell:
-```powershell
-# Claude Code: encuentra el script instalado y hace login
-$pa = (Get-ChildItem "$env:USERPROFILE\.claude\plugins\cache" -Recurse -Filter pa_api.py | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
-python $pa login
-# (si clonaste el repo, es más simple:  python scripts/pa_api.py login )
-```
-Se abre el navegador → inicia con tu cuenta de trabajo. Queda guardado en una
-caché cifrada; no lo tendrás que repetir.
+**2.** Dile a tu agente: *"conéctate a Power Automate"*. Te dará **un enlace y un
+código**; abre el enlace, ingresa el código e inicia con tu cuenta de Microsoft.
+Avísale al agente cuando termines y él confirma *"Sesión iniciada como…"*. Queda
+guardado en una caché cifrada; no lo repites.
 
-**3.** Vuelve a tu agente y habla normal: *"lista mis flujos"*, *"audita todos
-mis flujos"*, *"¿qué flujos están fallando por conexiones rotas?"*…
+**3.** Habla normal: *"lista mis flujos"*, *"audita todos mis flujos"*, *"¿qué
+flujos están fallando por conexiones rotas?"*…
+
+> ¿Prefieres la terminal? También puedes: `python scripts/pa_api.py login` (si
+> clonaste el repo) — abre el navegador directamente.
 
 ---
 
@@ -137,16 +131,17 @@ detalle va a un archivo), así que auditar 1 o 500 flujos cuesta casi lo mismo.
 ## 👥 Varias cuentas (personal / empresa)
 
 Si tus flujos de trabajo están en otra cuenta, puedes tener varias e ir
-cambiando. Estos comandos van en **tu terminal** (el login abre navegador):
+cambiando — todo **por lenguaje natural**, díselo al agente:
 
-| Acción | Comando |
+| Quiero… | Dile al agente |
 |---|---|
-| Ver a qué cuentas estás conectado | `python $pa sesion` |
-| Agregar otra cuenta | `python $pa login` (o `login --device --como correo@empresa.com`) |
-| Cambiar la cuenta activa | `python $pa cambiar-cuenta correo@empresa.com` |
-| Cerrar una cuenta / todas | `python $pa logout correo@empresa.com` · `logout --todas` |
+| Ver a qué cuentas estoy conectado | *"¿a qué cuentas estoy conectado?"* |
+| Agregar la cuenta de la empresa | *"conéctate con mi cuenta correo@empresa.com"* |
+| Cambiar la cuenta activa | *"usa mi cuenta correo@empresa.com"* |
+| Cerrar una cuenta / todas | *"cierra la sesión de correo@empresa.com"* · *"cierra todas las sesiones"* |
 
-Ya conectado, al agente le basta: *"usa mi cuenta correo@empresa.com"*.
+(El agente corre los comandos por ti: `sesion`, `login`, `cambiar-cuenta`,
+`logout`.)
 
 ---
 
@@ -170,8 +165,8 @@ Ya conectado, al agente le basta: *"usa mi cuenta correo@empresa.com"*.
 
 | Problema | Solución |
 |---|---|
-| **"No se abrió la página" al iniciar sesión** | El login debe correr en **tu** terminal, no dentro del agente. Usa el paso B de arriba, o `login --device` (te da un código para abrir a mano). |
-| **Dice que no hay sesión / no ve mis flujos** | Inicia sesión (paso B). Verifica con `python $pa sesion`. |
+| **"No se abrió la página" al iniciar sesión** | Dile al agente *"conéctate a Power Automate"*: te dará un enlace + código para abrir a mano (no depende de que abra el navegador). |
+| **Dice que no hay sesión / no ve mis flujos** | Conéctate (paso B). Pregúntale *"¿a qué cuenta estoy conectado?"* para verificar. |
 | **"Se necesita aprobación del administrador"** | Tu tenant exige consentimiento: pídelo a TI, o usa una app propia con `--client-id` (ver [api-conexion.md](references/api-conexion.md)). |
 | **El agente no toma la última versión** | Actualiza el plugin: `/plugin marketplace update …` → `/plugin update …`. |
 | **Errores `jq: command not found`** | **No son de este plugin** — son de otro plugin tuyo (`claude-code-warp`). Instala `jq` (`winget install jqlang.jq`) o desactiva ese plugin. |
