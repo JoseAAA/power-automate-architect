@@ -2,11 +2,11 @@
 name: pa-conectado
 allowed-tools: Bash(python *)
 description: >
-  USAR cuando el usuario pide cambiar el tenant: "aplica el arreglo", "corrige
-  mi flujo", "agrégale try/catch", "crea un flujo que haga X", "modifícalo para
-  que...", "enciende/apaga el flujo", "súbelo", "restaura el respaldo". NO usar
-  para solo listar o auditar (eso es pa-flujos) ni para flujos exportados a mano
-  (pa-auditoria). Requiere sesión iniciada (pa-flujos / pa_api.py login).
+  USAR cuando el usuario pide cambiar un flujo EXISTENTE del tenant: "aplica el
+  arreglo", "corrige mi flujo", "agrégale try/catch", "modifícalo para que...",
+  "enciende/apaga el flujo", "súbelo", "restaura el respaldo". NO usar para
+  crear flujos nuevos (pa-copiloto), listar/auditar (pa-flujos) ni flujos
+  exportados a mano (pa-auditoria). Requiere sesión iniciada (pa_api.py login).
 ---
 
 # Escritura conectada — modificar y crear flujos por lenguaje natural
@@ -49,14 +49,9 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" flujo <ID> --guardar flujo.json
    `python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" actualizar <ID> --archivo flujo.json --si`
 4. Valida con `corridas <ID>` y reporta en simple (+ ruta del respaldo).
 
-## Ciclo CREAR ("crea un flujo que avise cuando...")
-1. Máximo 2-3 preguntas si faltan: disparador, fuente de datos, acción final.
-2. Genera la definición partiendo de `${CLAUDE_PLUGIN_ROOT}/evals/flujos/flujo-limpio.json`
-   (estructura 100/100); nombre `[Área] - Verbo + resultado (Disparador)`.
-3. Audita hasta 🟢, muestra el plan, y con el OK:
-   `python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" crear --archivo nuevo.json --nombre "..." --si`
-4. Nace APAGADO: el usuario enlaza conexiones una vez en el portal (no se puede
-   por API delegada) y luego `encender <ID> --si`.
+## Crear flujos nuevos
+Eso es de la skill `pa-copiloto` (plantillas 100/100 + creación guiada); este
+modo solo modifica, enciende/apaga y restaura respaldos.
 
 ## Cargas condicionales (no cargues todo de una vez)
 | Lee | Solo cuando |

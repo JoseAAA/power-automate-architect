@@ -1,139 +1,175 @@
-# Power Automate Architect
+# ⚡ Power Automate Architect
 
-Copiloto experto para **Microsoft Power Automate** (cloud flows), construido como
-plugin de Claude Code. Facil para expertos y no expertos: cada respuesta da
-**solución y valor**, no más preguntas.
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
+![Licencia](https://img.shields.io/badge/Licencia-MIT-green)
+![AGENTS.md](https://img.shields.io/badge/est%C3%A1ndar-AGENTS.md-blue)
+![Agent Skills](https://img.shields.io/badge/est%C3%A1ndar-Agent%20Skills-blueviolet)
+![Local first](https://img.shields.io/badge/privacidad-100%25%20local-brightgreen)
 
-## Modos disponibles
+> Habla con tu asistente de IA en español y **audita, arregla y crea flujos de
+> Power Automate** con las mejores prácticas oficiales de Microsoft. Sin exportar
+> zips, sin servidores de terceros: un login de Microsoft y listo.
 
-### 🔍 Auditor (`pa-auditoria`)
+---
 
-Le pasas un flujo **exportado** y te dice qué tan bien sigue las mejores prácticas,
-con puntuación, hallazgos por severidad y el **arreglo concreto** de cada uno.
+## 📋 Contenido
 
-### 🔌 Conectado — lectura (`pa-flujos`)
+- [🚀 Instalación](#-instalación)
+- [✨ Funciones](#-funciones)
+- [💬 Cómo se usa (ejemplos reales)](#-cómo-se-usa-ejemplos-reales)
+- [🧠 Cómo funciona](#-cómo-funciona)
+- [🔐 Privacidad](#-privacidad)
+- [🩺 Problemas comunes](#-problemas-comunes)
+- [🧰 Stack](#-stack)
+- [🗺️ Roadmap](#️-roadmap)
 
-**Un solo login de Microsoft → todos tus flujos, sin exportar zips.**
+---
 
-```bash
-python scripts/pa_api.py login     # abre el navegador una vez (o --device)
-python scripts/pa_api.py flujos    # lista TODOS tus flujos (Mis flujos + soluciones)
-python scripts/pa_api.py auditar <ID>   # descarga y audita con el catálogo completo, local
-python scripts/pa_api.py corridas <ID>  # historial de ejecuciones (diagnóstico)
-```
+## 🚀 Instalación
 
-Requiere `pip install msal msal-extensions`. Usa login delegado con un client
-first-party de Microsoft (sin registrar apps; `--client-id` propio como fallback),
-tokens en caché cifrada local, y habla SOLO con APIs de Microsoft.
-
-### ✍️ Conectado — escritura (`pa-conectado`)
-
-Modificar y crear flujos **por lenguaje natural**, con triple red de seguridad:
-respaldo automático antes de tocar nada, auditoría previa que **bloquea**
-definiciones con hallazgos ALTA, y simulación por defecto (nada se ejecuta sin
-`--si`). Vía soportada por Microsoft (Dataverse) primero; maker API solo para
-flujos legacy.
+**Prerrequisitos:** [Python 3.10+](https://www.python.org/downloads/) y un agente
+de IA con terminal (Claude Code, OpenAI Codex, Gemini CLI u OpenCode).
 
 ```bash
-python scripts/pa_api.py actualizar <ID> --archivo flujo.json --si  # modificar (con respaldo)
-python scripts/pa_api.py crear --archivo f.json --nombre "X" --si   # crear (nace apagado)
-python scripts/pa_api.py encender <ID> --si                         # activar
+git clone https://github.com/JoseAAA/power-automate-architect.git
+cd power-automate-architect
+pip install msal msal-extensions requests   # solo para el modo conectado
 ```
 
-### 🔄 Vigilante del catálogo (`pa-actualizar`)
+Abre la carpeta con tu agente y ya está: el proyecto sigue los estándares
+**AGENTS.md** y **Agent Skills**, así que Claude Code, Codex, Gemini CLI y
+OpenCode descubren los modos solos (Claude vía `CLAUDE.md`/plugin; el resto vía
+`AGENTS.md` + `.agents/skills/`).
 
-`python scripts/actualizar_catalogo.py` — detecta commits y páginas nuevas en las
-fuentes oficiales (Microsoft Learn, Power CAT) para que las reglas nunca queden
-desactualizadas. Cadencia sugerida: mensual.
+> **Solo quieres auditar un flujo exportado (sin conectarte):** no necesitas
+> instalar nada más — el auditor es 100% offline con la librería estándar.
 
-## Úsalo desde cualquier agente (no solo Claude)
+---
 
-El repo sigue los estándares abiertos **AGENTS.md** y **Agent Skills**:
+## ✨ Funciones
 
-| Agente | Cómo |
+- 🔍 **Auditor de flujos** — **40 reglas automatizadas** (severidad
+  ALTA/MEDIA/BAJA/INFO) basadas en Microsoft Learn, Well-Architected y el Power
+  CAT Tools Code Review. Cada hallazgo trae su arreglo concreto y la fuente.
+- 🔑 **Un solo login → todos tus flujos** — lista, descarga, audita y diagnostica
+  directo del tenant (login delegado de Microsoft, sin registrar apps).
+- ✍️ **Arregla y crea por lenguaje natural** — "agrégale try/catch a mi flujo" o
+  "crea un flujo que avise cuando…". Con triple red de seguridad: respaldo
+  automático, auditoría previa que bloquea lo malo, y simulación antes de tocar.
+- 🧙 **Copiloto con plantillas 100/100** — alertas programadas, aprobaciones y
+  clasificación con IA, listas para personalizar sin saber JSON.
+- 🤖 **Al día con la IA de Power Automate** — reglas específicas para AI Builder
+  y agent flows (créditos, validación de salidas, humano en el circuito).
+- 🔄 **Vigilante del catálogo** — detecta cambios en la documentación oficial de
+  Microsoft para que las reglas nunca queden viejas.
+- 🧪 **Verificado** — 4 suites de regresión (auditor, conector, docs, consistencia)
+  con coincidencia exacta y cero falsos positivos tolerados.
+
+---
+
+## 💬 Cómo se usa (ejemplos reales)
+
+Dile a tu asistente, en español:
+
+| Tú dices | El asistente hace |
 |---|---|
-| **Claude Code** | Plugin de este repo (marketplace) — skills en `skills/` |
-| **OpenAI Codex** (CLI/IDE/ChatGPT desktop) | Lee `AGENTS.md` y las skills de `.agents/skills/` automáticamente al abrir el repo |
-| **Gemini CLI / Code Assist** | Ídem (`AGENTS.md` + `.agents/skills/`; `GEMINI.md` incluido) |
-| **OpenCode** | Ídem (además lee `skills/` formato Claude tal cual) |
-| **Claude Desktop (no técnicos)** | Servidor MCP `scripts/pa_mcp.py` — bundle `.mcpb` de doble clic (ver `mcpb/`) o `uvx pa-architect-mcp` |
+| *"Audita este flujo"* (+ el .zip exportado) | Informe con semáforo 🟢🟡🟠🔴, hallazgos y arreglos |
+| *"Conéctate a Power Automate y lista mis flujos"* | Login de Microsoft (una vez) → tabla de todos tus flujos |
+| *"¿Por qué falló mi flujo de vacaciones?"* | Historial de corridas + causa + arreglo |
+| *"Agrégale manejo de errores"* | Edita el JSON, lo audita, **te muestra el cambio y espera tu OK** antes de subir (con respaldo) |
+| *"Crea un flujo que pida aprobación cuando llegue una solicitud"* | Copiloto: 2-3 preguntas → plantilla 100/100 personalizada → creado (apagado, tú lo enciendes) |
+| *"¿Hay novedades de Power Automate?"* | Chequea las fuentes oficiales y propone actualizar reglas |
 
-Los scripts de `scripts/` son Python plano: cualquier agente con terminal los
-ejecuta. **Diseño validado con evidencia** (Anthropic engineering, eval de
-Arize, Ronacher/Willison): para agentes con terminal, CLI+skills es ~6x más
-barato que MCP con la misma exactitud → MCP queda **solo** para clientes GUI
-sin terminal (7 herramientas, confirmación por token de un solo uso,
-anotaciones read-only/destructive). ChatGPT web/desktop solo acepta MCP remoto
-(HTTPS): fuera del alcance local-first por ahora.
+---
 
-- **Privado y offline:** el análisis corre 100% en tu máquina (Python). No envía
-  datos a ningún servicio externo. Ideal para datos sensibles (legal, RR.HH.).
-- **Eficiente en tokens:** todo el análisis pesado es determinista en
-  `scripts/auditar_flujo.py`; el asistente solo lo ejecuta y lo explica en simple.
-- **Fundamentado:** cada regla cita Microsoft Learn (coding guidelines /
-  Well-Architected) y expertos reconocidos. Ver `references/buenas-practicas.md`.
-
-### Cómo se usa
-
-1. En Power Automate: **Mis flujos → … → Exportar → Paquete (.zip)**.
-2. En Claude Code, dile: *"audita este flujo"* y pásale la ruta al `.zip`
-   (o a la carpeta descomprimida, o al `definition.json`).
-3. Recibes el informe en el chat con el veredicto y los pasos para mejorar.
-
-### Probar a mano
-
-```bash
-python scripts/auditar_flujo.py "ruta/al/flujo.zip"   # auditar un flujo
-python evals/verificar_auditor.py                     # regresión del auditor
-```
-
-El catálogo tiene **40 reglas automatizadas** (severidad ALTA/MEDIA/BAJA/INFO),
-alineadas con el Power CAT Tools Code Review de Microsoft. Ver
-`references/buenas-practicas.md`.
-
-## Estructura
+## 🧠 Cómo funciona
 
 ```
-power-automate-architect/
-├── .claude-plugin/        plugin.json + marketplace.json
-├── skills/
-│   ├── pa-auditoria/      modo Auditor (flujo exportado)
-│   ├── pa-flujos/         modo conectado de lectura (login único)
-│   ├── pa-actualizar/     vigilante del catálogo (novedades de Microsoft)
-│   └── pa-conectado/      despliegue vía pac CLI (en evolución)
-├── scripts/
-│   ├── auditar_flujo.py        analizador determinista, 40 reglas
-│   ├── pa_api.py               conector (MSAL + maker API, solo lectura)
-│   └── actualizar_catalogo.py  vigila las fuentes oficiales (GitHub)
-├── evals/
-│   ├── verificar_auditor.py    regresión: códigos exactos por flujo de prueba
-│   ├── verificar_conector.py   prueba offline del conector (API simulada)
-│   └── flujos/                 5 flujos de prueba (4 con fallas + 1 limpio)
-└── references/
-    ├── buenas-practicas.md      catálogo de reglas PA-xxx + fuentes oficiales
-    ├── reglas-candidatas.md     backlog de reglas + estado de implementación
-    ├── ia-en-flujos.md          IA en Power Automate: costos y cuándo usarla
-    ├── api-conexion.md          arquitectura login único → todos los flujos
-    ├── estado-fuentes.json      última revisión de cada fuente oficial
-    └── panorama-herramientas.md mercado 2026: reutilizar vs construir
+ Tú (español) ──► Agente de IA (Claude/Codex/Gemini/OpenCode)
+                       │  lee las skills (qué hacer y cuándo)
+                       ▼
+              scripts/ (Python determinista)
+              ├─ auditar_flujo.py      analizador determinista, 40 reglas (offline)
+              ├─ pa_api.py             conector Microsoft (MSAL, login delegado)
+              └─ actualizar_catalogo.py vigilante de fuentes oficiales
+                       │
+                       ▼
+              APIs de Microsoft (con TU login)   ← nada de terceros
 ```
 
-## En el roadmap
+1. El análisis pesado es **determinista en Python** (0 tokens de razonamiento);
+   el asistente solo ejecuta y explica en simple.
+2. La escritura va por la **vía soportada de Microsoft** (Dataverse) con
+   respaldo + auditoría previa + simulación (`--si` para ejecutar de verdad).
+3. Los CLIs tienen salida `--json` con contrato estable
+   (`references/contrato-agente.md`) para que cualquier agente encadene pasos
+   sin raspar texto.
 
-- **📦 Release público:** publicar `pa-architect-mcp` en PyPI y el `.mcpb` en
-  GitHub Releases (pasos en `mcpb/README.md`); registrar en el MCP Registry.
-- **🧙 Plantillas del Copiloto:** biblioteca de patrones 100/100 por caso de uso
-  (aprobaciones, alertas programadas, procesamiento de documentos con IA) para
-  acelerar el modo crear.
-- **🌐 Conector remoto (solo si una empresa lo pide):** MCP por HTTPS
-  auto-hosteado en el tenant del cliente — habilitaría claude.ai web/móvil y
-  ChatGPT manteniendo el principio local-first.
+---
 
-> Alternativas evaluadas y descartadas para datos sensibles: FlowStudio MCP (SaaS
-> de pago) y MCPs de terceros — ver `references/panorama-herramientas.md` y
-> `references/nota-ti-flowstudio.md`.
+## 🔐 Privacidad
 
-## Fuentes
+Pensado para datos sensibles (legal, RR.HH., finanzas). Ver [SECURITY.md](SECURITY.md).
 
-Microsoft Learn (Power Automate coding guidelines, Power Platform Well-Architected,
-ALM), Matthew Devaney, Forward Forever, Reza Dorrani, Tom Riha, Pieter Veenstra.
+| Acción | ¿Sale a la red? |
+|---|---|
+| Auditar un flujo exportado | ❌ Nunca (100% local) |
+| Listar/leer/modificar tus flujos | ✅ Solo a APIs de Microsoft, con tu propio login |
+| Chequear novedades del catálogo | ✅ Solo metadatos públicos de GitHub |
+| Telemetría, analytics, servidores del proyecto | ❌ No existen |
+
+Tokens en caché local **cifrada** (DPAPI); nunca se muestran ni registran.
+`python scripts/pa_api.py logout` borra la sesión.
+
+---
+
+## 🩺 Problemas comunes
+
+| Problema | Solución |
+|---|---|
+| "No hay sesion activa" | `python scripts/pa_api.py login` (abre el navegador; `--device` para código) |
+| "Se necesita aprobación del administrador" al login | Tu tenant exige consentimiento: pide a TI aprobar el client, o usa una app propia con `--client-id` (guía en `references/api-conexion.md`) |
+| `flujos` devuelve 0 | Tu cuenta no es dueña/co-dueña de flujos en ese entorno: revisa `entornos` o pide co-propiedad |
+| Flujo aparece "Suspendido" | Lo bloqueó una política DLP del tenant: revisa qué conector chocó |
+| "La definicion nueva tiene hallazgos ALTA" | Es la red de seguridad: corrige lo señalado (o `--forzar` bajo tu responsabilidad) |
+| Un flujo nuevo no corre | Nace apagado: enlaza las conexiones en el portal y luego `encender <ID> --si` |
+| 429 / throttling | El conector ya reintenta con backoff; espera un momento |
+| Falta `msal` | `pip install msal msal-extensions requests` |
+
+---
+
+## 🧰 Stack
+
+| Capa | Tecnología |
+|---|---|
+| Análisis de flujos | Python 3 (stdlib), determinista |
+| Autenticación | MSAL (OAuth delegado de Microsoft) + msal-extensions (caché DPAPI) |
+| APIs | maker API (lectura) · Dataverse Web API (escritura soportada) |
+| Instrucciones del agente | AGENTS.md + Agent Skills (`skills/`, espejo `.agents/skills/`) |
+| Catálogo de reglas | Microsoft Learn · Power Platform Well-Architected · Power CAT Tools |
+| Pruebas | 4 suites en `evals/` (regresión exacta, API simulada, anti-drift) |
+
+Créditos: [Microsoft Learn](https://learn.microsoft.com/power-automate/guidance/coding-guidelines/),
+[Power CAT Tools](https://github.com/microsoft/Power-CAT-Tools), Matthew Devaney,
+Forward Forever, Tom Riha, Pieter Veenstra, David Wyatt.
+
+---
+
+## 🗺️ Roadmap
+
+- 📦 Release en GitHub (v1.0) y marketplace de plugins de Claude Code
+- 🧙 Más plantillas del copiloto (documentos con IA, sincronización de listas)
+- 📊 Auditoría masiva: puntuar todos los flujos del tenant de una vez
+- 🌐 Conector remoto auto-hosteado (solo si una empresa lo necesita para web/móvil)
+
+Issues y PRs bienvenidos.
+
+---
+
+## 👤 Autor
+
+**JoseAAA** · [github.com/JoseAAA](https://github.com/JoseAAA)
+
+## 📜 Licencia
+
+MIT — ver [LICENSE](LICENSE)

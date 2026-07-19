@@ -30,24 +30,28 @@ def main():
         pass
     solo_chequear = "--check" in sys.argv
     desactualizadas = []
-    # regenerar-sin-fusionar: espejos huerfanos (skill eliminada) se borran
-    nombres_origen = {p.parent.name for p in ORIGEN.glob("*/SKILL.md")}
-    for espejo in sorted(DESTINO.glob("*/SKILL.md")) if DESTINO.exists() else []:
-        if espejo.parent.name not in nombres_origen:
-            desactualizadas.append(espejo.parent.name + " (huerfana)")
-            if not solo_chequear:
-                espejo.unlink()
-                try:
-                    espejo.parent.rmdir()
-                except OSError:
-                    pass
-    for skill_md in sorted(ORIGEN.glob("*/SKILL.md")):
-        nombre = skill_md.parent.name
-        destino = DESTINO / nombre / "SKILL.md"
-        nuevo = contenido_convertido(skill_md)
+    # regenerar-sin-fusionar: espeja TODOS los archivos de cada skill (SKILL.md,
+    # plantillas, etc.) y borra espejos huerfanos de archivos/skills eliminados
+    rel_origen = {p.relative_to(ORIGEN) for p in ORIGEN.rglob("*") if p.is_file()}
+    if DESTINO.exists():
+        for espejo in sorted(DESTINO.rglob("*")):
+            if espejo.is_file() and espejo.relative_to(DESTINO) not in rel_origen:
+                desactualizadas.append(f"{espejo.relative_to(DESTINO)} (huerfano)")
+                if not solo_chequear:
+                    espejo.unlink()
+                    try:
+                        espejo.parent.rmdir()
+                    except OSError:
+                        pass
+    for rel in sorted(rel_origen):
+        origen, destino = ORIGEN / rel, DESTINO / rel
+        if origen.suffix == ".md":
+            nuevo = contenido_convertido(origen)
+        else:
+            nuevo = origen.read_text(encoding="utf-8")
         actual = destino.read_text(encoding="utf-8") if destino.exists() else None
         if actual != nuevo:
-            desactualizadas.append(nombre)
+            desactualizadas.append(str(rel))
             if not solo_chequear:
                 destino.parent.mkdir(parents=True, exist_ok=True)
                 destino.write_text(nuevo, encoding="utf-8")

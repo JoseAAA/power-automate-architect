@@ -1,0 +1,104 @@
+{
+  "properties": {
+    "displayName": "Area - Aprobar solicitudes nuevas (Al crear item)",
+    "description": "Cuando llega una solicitud nueva, pide aprobacion (7 dias de plazo) y avisa el resultado al solicitante. Try/Catch con Terminate; destinatarios dinamicos; conexiones por referencia.",
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "triggers": {
+        "Cuando_llega_una_solicitud": {
+          "type": "OpenApiConnection",
+          "conditions": [ { "expression": "@not(empty(triggerOutputs()?['body/Title']))" } ],
+          "inputs": {
+            "host": { "connectionName": "shared_sharepointonline", "operationId": "GetOnNewItems", "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
+            "parameters": {
+              "dataset": "@parameters('SitioSolicitudes (demo_Sitio)')",
+              "table": "@parameters('ListaSolicitudes (demo_Lista)')"
+            }
+          }
+        }
+      },
+      "actions": {
+        "Try": {
+          "type": "Scope",
+          "runAfter": {},
+          "description": "Pedir la aprobacion y avisar el resultado al solicitante",
+          "actions": {
+            "Iniciar_y_esperar_la_aprobacion": {
+              "type": "OpenApiConnectionWebhook",
+              "runAfter": {},
+              "limit": { "timeout": "P7D" },
+              "inputs": {
+                "host": { "connectionName": "shared_approvals", "operationId": "StartAndWaitForAnApproval", "apiId": "/providers/Microsoft.PowerApps/apis/shared_approvals" },
+                "parameters": {
+                  "approvalType": "Basic",
+                  "WebhookApprovalRequestInput/title": "Aprobar solicitud: @{triggerOutputs()?['body/Title']}",
+                  "WebhookApprovalRequestInput/assignedTo": "@parameters('CorreoAprobador (demo_Aprobador)')"
+                }
+              }
+            },
+            "Si_fue_aprobada": {
+              "type": "If",
+              "runAfter": { "Iniciar_y_esperar_la_aprobacion": ["Succeeded"] },
+              "expression": { "and": [ { "equals": [ "@outputs('Iniciar_y_esperar_la_aprobacion')?['body/outcome']", "Approve" ] } ] },
+              "actions": {
+                "Avisar_solicitud_aprobada": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": { "connectionName": "shared_office365", "operationId": "SendEmailV2", "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365" },
+                    "parameters": {
+                      "emailMessage/To": "@triggerOutputs()?['body/Author/Email']",
+                      "emailMessage/Subject": "Tu solicitud fue APROBADA: @{triggerOutputs()?['body/Title']}",
+                      "emailMessage/Body": "Aprobada por: @{outputs('Iniciar_y_esperar_la_aprobacion')?['body/responder/displayName']}"
+                    },
+                    "retryPolicy": { "type": "exponential", "count": 4, "interval": "PT7S" }
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Avisar_solicitud_rechazada": {
+                    "type": "OpenApiConnection",
+                    "runAfter": {},
+                    "inputs": {
+                      "host": { "connectionName": "shared_office365", "operationId": "SendEmailV2", "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365" },
+                      "parameters": {
+                        "emailMessage/To": "@triggerOutputs()?['body/Author/Email']",
+                        "emailMessage/Subject": "Tu solicitud fue rechazada: @{triggerOutputs()?['body/Title']}",
+                        "emailMessage/Body": "Comentarios: @{outputs('Iniciar_y_esperar_la_aprobacion')?['body/responses']}"
+                      },
+                      "retryPolicy": { "type": "exponential", "count": 4, "interval": "PT7S" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Catch": {
+          "type": "Scope",
+          "runAfter": { "Try": ["Failed", "TimedOut"] },
+          "description": "Registra el error (o el timeout de 7 dias) y termina la corrida como fallida",
+          "actions": {
+            "Redactar_detalle_del_error": {
+              "type": "Compose",
+              "runAfter": {},
+              "inputs": "@result('Try')"
+            },
+            "Terminar_como_fallido": {
+              "type": "Terminate",
+              "runAfter": { "Redactar_detalle_del_error": ["Succeeded"] },
+              "inputs": { "runStatus": "Failed", "runError": { "code": "AprobacionFallida", "message": "La aprobacion fallo o vencio el plazo de 7 dias" } }
+            }
+          }
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_sharepointonline": { "connectionName": "sp-solicitudes", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
+      "shared_approvals": { "connectionName": "aprobaciones", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_approvals" },
+      "shared_office365": { "connectionName": "correo", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_office365" }
+    }
+  }
+}

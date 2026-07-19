@@ -1,0 +1,109 @@
+{
+  "properties": {
+    "displayName": "Area - Clasificar solicitudes con IA (Al crear item)",
+    "description": "Cuando llega una solicitud, un prompt de AI Builder la clasifica; la salida se valida con Parse JSON y una condicion decide si escalar. Cumple el patron de IA con validacion (PA-IA-01). Ojo: consume creditos de IA por ejecucion.",
+    "definition": {
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "triggers": {
+        "Cuando_llega_una_solicitud": {
+          "type": "OpenApiConnection",
+          "conditions": [ { "expression": "@not(empty(triggerOutputs()?['body/Descripcion']))" } ],
+          "inputs": {
+            "host": { "connectionName": "shared_sharepointonline", "operationId": "GetOnNewItems", "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
+            "parameters": {
+              "dataset": "@parameters('SitioSolicitudes (demo_Sitio)')",
+              "table": "@parameters('ListaSolicitudes (demo_Lista)')"
+            }
+          }
+        }
+      },
+      "actions": {
+        "Try": {
+          "type": "Scope",
+          "runAfter": {},
+          "description": "Clasificar con IA, validar la salida y escalar solo lo urgente",
+          "actions": {
+            "Ejecutar_prompt_clasificador": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "aibuilderpredict", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+                "parameters": {
+                  "recordId": "@parameters('IdPromptClasificador (demo_IdPrompt)')",
+                  "item/requestv2/text": "@triggerOutputs()?['body/Descripcion']"
+                },
+                "retryPolicy": { "type": "exponential", "count": 4, "interval": "PT7S" }
+              }
+            },
+            "Interpretar_la_respuesta": {
+              "type": "ParseJson",
+              "runAfter": { "Ejecutar_prompt_clasificador": ["Succeeded"] },
+              "inputs": {
+                "content": "@outputs('Ejecutar_prompt_clasificador')?['body/responsev2/predictionOutput/text']",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "categoria": { "type": "string" },
+                    "motivo": { "type": "string" }
+                  }
+                }
+              }
+            },
+            "Si_es_urgente": {
+              "type": "If",
+              "runAfter": { "Interpretar_la_respuesta": ["Succeeded"] },
+              "expression": { "and": [ { "equals": [ "@body('Interpretar_la_respuesta')?['categoria']", "urgente" ] } ] },
+              "actions": {
+                "Escalar_al_responsable": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": { "connectionName": "shared_office365", "operationId": "SendEmailV2", "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365" },
+                    "parameters": {
+                      "emailMessage/To": "@triggerOutputs()?['body/Author/Email']",
+                      "emailMessage/Subject": "URGENTE: @{triggerOutputs()?['body/Title']}",
+                      "emailMessage/Body": "La IA clasifico esta solicitud como urgente. Motivo: @{body('Interpretar_la_respuesta')?['motivo']} (revision humana pendiente)"
+                    },
+                    "retryPolicy": { "type": "exponential", "count": 4, "interval": "PT7S" }
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Registrar_categoria_normal": {
+                    "type": "Compose",
+                    "runAfter": {},
+                    "inputs": "@body('Interpretar_la_respuesta')?['categoria']"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Catch": {
+          "type": "Scope",
+          "runAfter": { "Try": ["Failed", "TimedOut"] },
+          "description": "La IA puede fallar por cuota o moderacion: registrar y terminar como fallido",
+          "actions": {
+            "Redactar_detalle_del_error": {
+              "type": "Compose",
+              "runAfter": {},
+              "inputs": "@result('Try')"
+            },
+            "Terminar_como_fallido": {
+              "type": "Terminate",
+              "runAfter": { "Redactar_detalle_del_error": ["Succeeded"] },
+              "inputs": { "runStatus": "Failed", "runError": { "code": "ClasificacionFallida", "message": "Fallo la clasificacion con IA (cuota, moderacion o timeout)" } }
+            }
+          }
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_sharepointonline": { "connectionName": "sp-solicitudes", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
+      "shared_commondataserviceforapps": { "connectionName": "dataverse-ia", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
+      "shared_office365": { "connectionName": "correo", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_office365" }
+    }
+  }
+}

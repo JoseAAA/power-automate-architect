@@ -34,7 +34,7 @@
           "inputs": {
             "method": "POST",
             "uri": "https://api.ejemplo.com/notificar",
-            "headers": { "api_key": "sk-live-abcdef1234567890" },
+            "headers": { "api_key": "clave-falsa-solo-para-pruebas" },
             "body": { "fecha": "@addHours(utcNow(), -5)" }
           }
         },

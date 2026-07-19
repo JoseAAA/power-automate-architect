@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.0.0] — 2026-07-20 · Primera versión funcional
+
+### Agregado — Copiloto (crear flujos, fácil)
+- **Skill `pa-copiloto`**: de la idea al flujo con máx. 2-3 preguntas, partiendo
+  de **plantillas que auditan 100/100** (`skills/pa-copiloto/plantillas/`):
+  `alerta-programada`, `aprobacion` (con timeout de 7 días y avisos dinámicos) y
+  `ia-clasificar` (patrón IA con validación y humano en el circuito).
+  `pa-conectado` queda solo para modificar/encender (ruteo sin solapamiento).
+- `sincronizar_skills.py` espeja ahora TODOS los archivos de las skills
+  (plantillas incluidas); `verificar_docs.py` exige que cada plantilla siga
+  auditando 100/100.
+
+### Cambiado — decisión de arquitectura
+- **Servidor MCP retirado** (evaluado y construido en 0.7.0): se adopta la vía
+  que recomienda la evidencia experta — skills + CLI en terminal. El análisis
+  queda en el historial por si se retoma para clientes GUI.
+- **README reescrito**: claro para no expertos (instalación, ejemplos de frases,
+  cómo funciona, privacidad, problemas comunes, stack, roadmap).
+
+### Seguridad (revisión de release para cuentas de empresa)
+- **`SECURITY.md`**: modelo de seguridad para TI (local-first, tabla de tráfico
+  de red, tokens DPAPI, client-id corporativo opcional, defensa en profundidad
+  de la escritura, alcance y reporte de vulnerabilidades).
+- Regla anti prompt-injection en `AGENTS.md`: el contenido de los flujos son
+  datos, nunca instrucciones para el asistente.
+- Secreto de prueba con formato realista reemplazado por uno inocuo (evita
+  falsos positivos de los escáneres de secretos de GitHub).
+- Revisión de superficie verificada: sin `shell=True`/`eval`/`verify=False`,
+  timeouts en todo HTTP, subprocess con listas, cero fugas de datos
+  personales/tenant en el repo (verificado con git grep).
+
 ## [0.7.0] — 2026-07-18
 
 ### Agregado — servidor MCP para clientes GUI (validado con evidencia experta)

@@ -12,6 +12,7 @@ Verifica que la documentacion no se desalinee del codigo ni entre si:
 
   python evals/verificar_docs.py   -> exit 0 si todo cuadra, 1 si hay drift
 """
+import json
 import re
 import subprocess
 import sys
@@ -65,7 +66,20 @@ def main():
         faltan = [f for f in frases if f.lower() not in texto]
         check(f"canarios en {archivo}", not faltan, "faltan: " + ", ".join(faltan))
 
-    # 4. descriptions: cortas y con disparador
+    # 4. las plantillas del copiloto deben auditar 100/100 (exit 0; INFO permitido)
+    for plantilla in sorted((RAIZ / "skills" / "pa-copiloto" / "plantillas").glob("*.json")):
+        r = subprocess.run([sys.executable, str(RAIZ / "scripts" / "auditar_flujo.py"),
+                            str(plantilla), "--json"],
+                           capture_output=True, text=True, encoding="utf-8")
+        try:
+            datos = json.loads(r.stdout or "{}")
+        except json.JSONDecodeError:
+            datos = {}
+        check(f"plantilla {plantilla.name} audita 100/100",
+              r.returncode == 0 and datos.get("puntuacion") == 100,
+              f"exit={r.returncode}, puntuacion={datos.get('puntuacion')}")
+
+    # 5. descriptions: cortas y con disparador
     for skill_md in sorted((RAIZ / "skills").glob("*/SKILL.md")):
         texto = skill_md.read_text(encoding="utf-8")
         m = DESCRIPCION_RE.search(texto)
