@@ -428,20 +428,31 @@ def cmd_entornos(args):
     return 0
 
 
+def _estado_flujo(p):
+    estado = p.get("state", "?")
+    if p.get("flowSuspensionReason") and str(p.get("flowSuspensionReason")).lower() not in ("", "none"):
+        estado = "Suspendido"  # tipicamente por politica DLP
+    return estado
+
+
 def cmd_flujos(args):
     token, _ = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
     entorno = args.entorno or entorno_por_defecto(token)
     flujos = listar_flujos(token, entorno)
     flujos.sort(key=lambda f: str((f.get("properties", {}) or {}).get("displayName", "")).lower())
+    if args.como_json:
+        print(json.dumps({"contrato": "pa-architect/flujos@1", "entorno": entorno,
+                          "flujos": [{"id": f.get("name"),
+                                      "nombre": (f.get("properties", {}) or {}).get("displayName", "?"),
+                                      "estado": _estado_flujo(f.get("properties", {}) or {})}
+                                     for f in flujos]}, ensure_ascii=False, indent=1))
+        return 0
     print(f"{len(flujos)} flujo(s) en {entorno}:\n")
     print(f"  {'ESTADO':<10} {'FLUJO':<52} ID")
     for f in flujos:
         p = f.get("properties", {}) or {}
-        estado = p.get("state", "?")
-        if p.get("flowSuspensionReason") and str(p.get("flowSuspensionReason")).lower() not in ("", "none"):
-            estado = "Suspendido"  # tipicamente por politica DLP
         nombre = str(p.get("displayName", "?"))[:50]
-        print(f"  {estado:<10} {nombre:<52} {f.get('name')}")
+        print(f"  {_estado_flujo(p):<10} {nombre:<52} {f.get('name')}")
     if not flujos:
         print("  (nada aqui: revisa el entorno con 'entornos' o tus permisos)")
     print("\nDetalle:  python pa_api.py flujo <ID>   |   Auditar:  python pa_api.py auditar <ID>")
@@ -471,6 +482,15 @@ def cmd_corridas(args):
     token, _ = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
     entorno = args.entorno or entorno_por_defecto(token)
     corridas = listar_corridas(token, entorno, args.flow_id)
+    if args.como_json:
+        print(json.dumps({"contrato": "pa-architect/corridas@1", "flujo": args.flow_id,
+                          "corridas": [{"estado": (c.get("properties", {}) or {}).get("status", "?"),
+                                        "inicio": _fecha((c.get("properties", {}) or {}).get("startTime")),
+                                        "fin": _fecha((c.get("properties", {}) or {}).get("endTime")),
+                                        "error": ((c.get("properties", {}) or {}).get("error") or {}).get("code", "")}
+                                       for c in corridas[:int(args.max)]]},
+                         ensure_ascii=False, indent=1))
+        return 0
     print(f"{len(corridas)} corrida(s) (mas recientes primero):\n")
     for c in corridas[:int(args.max)]:
         p = c.get("properties", {}) or {}
@@ -572,12 +592,15 @@ def main():
     p.set_defaults(fn=cmd_login)
     p = sub.add_parser("logout", help="Borrar la sesion local");        p.set_defaults(fn=cmd_logout)
     p = sub.add_parser("entornos", help="Listar entornos");             comunes(p); p.set_defaults(fn=cmd_entornos)
-    p = sub.add_parser("flujos", help="Listar todos mis flujos");       comunes(p); p.set_defaults(fn=cmd_flujos)
+    p = sub.add_parser("flujos", help="Listar todos mis flujos");       comunes(p)
+    p.add_argument("--json", action="store_true", dest="como_json", help="salida estructurada (contrato estable)")
+    p.set_defaults(fn=cmd_flujos)
     p = sub.add_parser("flujo", help="Detalle/definicion de un flujo"); comunes(p)
     p.add_argument("flow_id"); p.add_argument("--guardar", help="ruta .json donde guardar la definicion")
     p.set_defaults(fn=cmd_flujo)
     p = sub.add_parser("corridas", help="Historial de ejecuciones");    comunes(p)
     p.add_argument("flow_id"); p.add_argument("--max", default="15", help="cuantas mostrar (def. 15)")
+    p.add_argument("--json", action="store_true", dest="como_json", help="salida estructurada (contrato estable)")
     p.set_defaults(fn=cmd_corridas)
     p = sub.add_parser("auditar", help="Descargar un flujo y auditarlo"); comunes(p)
     p.add_argument("flow_id"); p.set_defaults(fn=cmd_auditar)
@@ -604,7 +627,12 @@ def main():
     try:
         return args.fn(args)
     except PaApiError as e:
-        print(f"\nERROR: {e}")
+        # En modo --json el error tambien es JSON (un solo documento por invocacion)
+        if getattr(args, "como_json", False):
+            print(json.dumps({"contrato": "pa-architect/error@1", "error": str(e)},
+                             ensure_ascii=False))
+        else:
+            print(f"\nERROR: {e}")
         return 3
     except KeyboardInterrupt:
         print("\nCancelado.")

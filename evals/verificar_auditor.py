@@ -10,6 +10,7 @@ ni reglas que dejaron de disparar). Ejecutar tras cualquier cambio del auditor:
 
 Codigo de salida: 0 si todo coincide, 1 si hay diferencias.
 """
+import json
 import re
 import subprocess
 import sys
@@ -58,10 +59,21 @@ def main():
         r = subprocess.run([sys.executable, str(AUDITOR), str(ruta)],
                            capture_output=True, text=True, encoding="utf-8")
         detectados = set(CODIGO_RE.findall(r.stdout or ""))
+        # el contrato --json debe coincidir con el reporte humano (mismos codigos y exit)
+        rj = subprocess.run([sys.executable, str(AUDITOR), str(ruta), "--json"],
+                            capture_output=True, text=True, encoding="utf-8")
+        try:
+            datos = json.loads(rj.stdout or "{}")
+            json_codigos = {h["codigo"] for h in datos.get("hallazgos", [])}
+            json_ok = (json_codigos == esperados and rj.returncode == exit_esp
+                       and datos.get("contrato") == "pa-architect/auditoria@1")
+        except (json.JSONDecodeError, KeyError, TypeError):
+            json_ok = False
         faltan = esperados - detectados
         sobran = detectados - esperados
-        ok = not faltan and not sobran and r.returncode == exit_esp
-        print(f"{'OK  ' if ok else 'FALLO'} {nombre}: {len(detectados)} regla(s), exit={r.returncode}")
+        ok = not faltan and not sobran and r.returncode == exit_esp and json_ok
+        print(f"{'OK  ' if ok else 'FALLO'} {nombre}: {len(detectados)} regla(s), "
+              f"exit={r.returncode}, json={'OK' if json_ok else 'FALLO'}")
         if faltan:
             print(f"      faltan:  {', '.join(sorted(faltan))}")
         if sobran:

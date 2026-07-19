@@ -863,18 +863,26 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8")
     except Exception:
         pass
-    if len(sys.argv) != 2:
+    modo_json = "--json" in sys.argv[1:]
+    posicionales = [a for a in sys.argv[1:] if a != "--json"]
+
+    def error(msg):
+        print(json.dumps({"contrato": "pa-architect/auditoria@1", "error": msg},
+                         ensure_ascii=False) if modo_json else msg)
+        return 2
+
+    if len(posicionales) != 1:
+        if modo_json:
+            return error("Uso: auditar_flujo.py <ruta> [--json]")
         print(__doc__)
         return 2
-    ruta = Path(sys.argv[1])
+    ruta = Path(posicionales[0])
     if not ruta.exists():
-        print(f"No existe la ruta: {ruta}")
-        return 2
+        return error(f"No existe la ruta: {ruta}")
 
     nombre, defn, connrefs, descripcion = cargar_flujo(ruta)
     if defn is None:
-        print("No se encontro una definicion de flujo valida (definition.json con triggers/actions).")
-        return 2
+        return error("No se encontro una definicion de flujo valida (definition.json con triggers/actions).")
 
     hallazgos, n_acciones, triggers = auditar(defn, connrefs, descripcion)
 
@@ -883,6 +891,36 @@ def main():
     for cod, _ in hallazgos:
         score -= PESO_SEV[REGLAS[cod][0]]
     score = max(0, score)
+
+    if modo_json:
+        # Contrato estable para agentes y automatizacion (version en "contrato").
+        vistos = {}
+        for cod, extra in hallazgos:
+            vistos.setdefault(cod, []).append(extra)
+        items = []
+        n_alta = 0
+        for cod, extras in sorted(vistos.items(), key=lambda kv: (ORDEN_SEV[REGLAS[kv[0]][0]], kv[0])):
+            sev, _p, titulo, arreglo, fuente = REGLAS[cod]
+            if sev == "ALTA":
+                n_alta += len(extras)
+            items.append({"codigo": cod, "severidad": sev, "titulo": titulo,
+                          "ocurrencias": len(extras),
+                          "donde": [e for e in extras if e],
+                          "arreglo": arreglo, "fuente": fuente})
+        print(json.dumps({
+            "contrato": "pa-architect/auditoria@1",
+            "flujo": nombre,
+            "puntuacion": score,
+            "veredicto": veredicto(score),
+            "acciones": n_acciones,
+            "triggers": sorted({(t.get("type") or "?") for t in triggers.values()}),
+            "conexiones": len(connrefs or {}),
+            "hallazgos": items,
+            "totales": {"tipos": len(vistos),
+                        "ocurrencias": sum(len(v) for v in vistos.values()),
+                        "alta": n_alta},
+        }, ensure_ascii=False, indent=1))
+        return 1 if n_alta else 0
 
     trg_tipos = ", ".join(sorted({(t.get("type") or "?") for t in triggers.values()})) or "?"
     print("=" * 70)

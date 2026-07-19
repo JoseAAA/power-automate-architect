@@ -1,5 +1,6 @@
 ---
 name: pa-auditoria
+allowed-tools: Bash(python *)
 description: >
   Audita un flujo de Power Automate (cloud flow) contra las mejores practicas.
   USAR cuando el usuario sube o apunta a un flujo exportado (.zip de "exportar

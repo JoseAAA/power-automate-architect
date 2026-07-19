@@ -1,5 +1,6 @@
 ---
 name: pa-actualizar
+allowed-tools: Bash(python *)
 description: >
   Mantiene el catálogo de mejores prácticas SIEMPRE al día con las fuentes
   oficiales. USAR cuando el usuario pregunta "¿hay novedades de Power Automate?",

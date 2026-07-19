@@ -30,6 +30,17 @@ def main():
         pass
     solo_chequear = "--check" in sys.argv
     desactualizadas = []
+    # regenerar-sin-fusionar: espejos huerfanos (skill eliminada) se borran
+    nombres_origen = {p.parent.name for p in ORIGEN.glob("*/SKILL.md")}
+    for espejo in sorted(DESTINO.glob("*/SKILL.md")) if DESTINO.exists() else []:
+        if espejo.parent.name not in nombres_origen:
+            desactualizadas.append(espejo.parent.name + " (huerfana)")
+            if not solo_chequear:
+                espejo.unlink()
+                try:
+                    espejo.parent.rmdir()
+                except OSError:
+                    pass
     for skill_md in sorted(ORIGEN.glob("*/SKILL.md")):
         nombre = skill_md.parent.name
         destino = DESTINO / nombre / "SKILL.md"

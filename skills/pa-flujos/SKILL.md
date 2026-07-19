@@ -1,5 +1,6 @@
 ---
 name: pa-flujos
+allowed-tools: Bash(python *)
 description: >
   Modo conectado de LECTURA (vía 100% Microsoft, sin terceros): un solo login →
   listar, inspeccionar y auditar TODOS los cloud flows del usuario sin exportar
@@ -24,6 +25,8 @@ solución), descarga definiciones, muestra corridas y audita contra el catálogo
 ## Comandos (todos vía `${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py`)
 
 Requisito único: `pip install msal msal-extensions requests` (si falta, instálalo).
+Para encadenar resultados agrega `--json` a `flujos`/`corridas` (contrato estable,
+ver `${CLAUDE_PLUGIN_ROOT}/references/contrato-agente.md`); no raspes el texto humano.
 
 ```bash
 python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" login            # abre el navegador (una vez)

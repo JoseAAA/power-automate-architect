@@ -1,5 +1,6 @@
 ---
 name: pa-conectado
+allowed-tools: Bash(python *)
 description: >
   USAR cuando el usuario pide cambiar el tenant: "aplica el arreglo", "corrige
   mi flujo", "agrégale try/catch", "crea un flujo que haga X", "modifícalo para
@@ -41,8 +42,8 @@ python "scripts/pa_api.py" flujo <ID> --guardar flujo.json
 ```
 1. Edita `flujo.json` con el cambio pedido. NO inventes operationId/apiId:
    reutiliza los de la definición.
-2. Audita local hasta quedar sin ALTA:
-   `python "scripts/auditar_flujo.py" flujo.json`
+2. Audita local hasta quedar sin ALTA (con `--json` para leer códigos/score
+   sin raspar texto): `python "scripts/auditar_flujo.py" flujo.json --json`
 3. Muestra al usuario el resumen (acciones que cambian, score antes → después)
    y pide confirmación. Con el OK:
    `python "scripts/pa_api.py" actualizar <ID> --archivo flujo.json --si`

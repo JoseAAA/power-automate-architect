@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.6.0] — 2026-07-18
+
+### Agregado — contrato JSON agente-agnóstico (estudio de Fission-AI/OpenSpec)
+- **`--json` en los CLIs** (patrón gather-then-render): `auditar_flujo.py <ruta>
+  --json` (contrato `pa-architect/auditoria@1` con hallazgos estructurados y
+  arreglo accionable por hallazgo), `pa_api.py flujos --json` y `corridas --json`
+  (`@1`). Un documento JSON por invocación; los errores en modo JSON también
+  salen como JSON (`pa-architect/error@1`); mismos exit codes que el modo humano.
+  Convenciones en `references/contrato-agente.md`.
+- **La regresión exige paridad**: `verificar_auditor.py` compara los códigos del
+  JSON contra el reporte humano en los 5 flujos — no pueden divergir.
+- **`allowed-tools: Bash(python *)`** en las 4 skills (patrón OpenSpec v1.6.0):
+  los agentes ejecutan los scripts del plugin sin fricción de permisos.
+- `sincronizar_skills.py` ahora regenera-sin-fusionar: borra espejos huérfanos
+  de skills eliminadas.
+- Backlog anotado: carpeta de cambios `cambios/<flujo>/` estilo propose/apply de
+  OpenSpec (el gate determinista —auditoría exit 1 bloquea— ya existe).
+
 ## [0.5.1] — 2026-07-18
 
 ### Mejorado — eficiencia de tokens y anti-drift (estudio de skills-for-fabric, superpowers y ponytail)
