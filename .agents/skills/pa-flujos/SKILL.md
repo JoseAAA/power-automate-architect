@@ -38,6 +38,7 @@ python "scripts/pa_api.py" flujos           # TODOS los flujos del usuario
 python "scripts/pa_api.py" flujo <ID> --guardar flujo.json
 python "scripts/pa_api.py" corridas <ID>
 python "scripts/pa_api.py" auditar <ID>     # descarga + auditoría local
+python "scripts/pa_api.py" auditar-todos --detalle informe.json  # tablero del tenant
 ```
 
 ## Procedimiento
@@ -59,6 +60,13 @@ python "scripts/pa_api.py" auditar <ID>     # descarga + auditoría local
 4. **Diagnosticar fallas.** `corridas <ID>` → si hay `Failed`, correlaciona con
    los hallazgos de la auditoría (ej. sin retry → fallas transitorias) y explica
    el arreglo concreto.
+5. **Tablero del tenant** ("audita todos mis flujos", "¿cómo está mi tenant?"):
+   `auditar-todos --detalle informe.json`. Presenta al usuario SOLO el resumen
+   que imprime (media, distribución 🟢🟡🟠🔴, peores, reglas más incumplidas) —
+   es de tamaño fijo aunque haya cientos de flujos. **NO leas el archivo
+   `--detalle`**: es el detalle por flujo y solo se abre si el usuario pide uno
+   concreto (o audita ese flujo con `auditar <ID>`). Así el costo en tokens es
+   mínimo sin importar el tamaño del tenant.
 
 ## Errores comunes y qué hacer
 - **"Se necesita aprobación del administrador" al hacer login:** el tenant exige

@@ -12,6 +12,7 @@ Uso:
   python pa_api.py flujo <flowId> [--guardar ruta.json]   Detalle/definicion de un flujo
   python pa_api.py corridas <flowId>       Historial de ejecuciones
   python pa_api.py auditar <flowId>        Descarga el flujo y corre el auditor local
+  python pa_api.py auditar-todos [--detalle f.json]  Audita TODO el tenant (resumen)
   python pa_api.py actualizar <flowId> --archivo f.json --si   Modifica un flujo (con respaldo)
   python pa_api.py crear --archivo f.json --nombre "X" --si    Crea un flujo (nace apagado)
   python pa_api.py encender <flowId> --si  Activa un flujo
@@ -602,6 +603,118 @@ def cmd_auditar(args):
         return r.returncode
 
 
+def _connrefs_dict(connrefs):
+    if isinstance(connrefs, list):
+        return {str(c.get("connectionName") or j): c for j, c in enumerate(connrefs)}
+    return connrefs or {}
+
+
+def auditar_tenant(token, entorno, progreso=False):
+    """Audita TODOS los flujos del entorno con Python (0 tokens de IA) y devuelve
+    un AGREGADO compacto + el detalle por flujo. El caller decide que exponer al
+    asistente (resumen) y que mandar a archivo (detalle)."""
+    import importlib
+    A = importlib.import_module("auditar_flujo")
+    from collections import Counter
+
+    flujos = listar_flujos(token, entorno)
+    total = len(flujos)
+    resultados, no_accesibles = [], 0
+    for i, f in enumerate(flujos, 1):
+        if progreso and (i == 1 or i % 10 == 0 or i == total):
+            print(f"  auditando {i}/{total}...", file=sys.stderr)
+        fid = f.get("name")
+        props = f.get("properties", {}) or {}
+        defn = props.get("definition")
+        connrefs, desc = props.get("connectionReferences"), props.get("description", "")
+        nombre = props.get("displayName", fid)
+        if not defn:  # el listado no siempre trae la definicion completa: pedirla
+            try:
+                p2 = (obtener_flujo(token, entorno, fid).get("properties", {}) or {})
+                defn, connrefs = p2.get("definition"), p2.get("connectionReferences")
+                desc = p2.get("description", desc)
+            except PaApiError:
+                no_accesibles += 1
+                continue
+        if not defn:
+            no_accesibles += 1
+            continue
+        hallazgos, _n, _t = A.auditar(defn, _connrefs_dict(connrefs), desc)
+        score, conteo, codigos = 100, {"ALTA": 0, "MEDIA": 0, "BAJA": 0, "INFO": 0}, set()
+        for cod, _extra in hallazgos:
+            sev = A.REGLAS[cod][0]
+            score -= A.PESO_SEV[sev]
+            conteo[sev] += 1
+            codigos.add(cod)
+        resultados.append({"id": fid, "nombre": nombre, "puntuacion": max(0, score),
+                           "alta": conteo["ALTA"], "media": conteo["MEDIA"],
+                           "codigos": sorted(codigos)})
+
+    aud = len(resultados)
+    dist = {"verde": 0, "amarillo": 0, "naranja": 0, "rojo": 0}
+    for r in resultados:
+        s = r["puntuacion"]
+        clave = "verde" if s >= 90 else "amarillo" if s >= 75 else "naranja" if s >= 50 else "rojo"
+        dist[clave] += 1
+    freq = Counter(c for r in resultados for c in r["codigos"])
+    reglas = [{"codigo": c, "severidad": A.REGLAS[c][0], "titulo": A.REGLAS[c][2], "flujos": n}
+              for c, n in freq.most_common(12)]
+    return {
+        "contrato": "pa-architect/auditoria-tenant@1", "entorno": entorno,
+        "auditados": aud, "no_accesibles": no_accesibles,
+        "puntuacion_media": round(sum(r["puntuacion"] for r in resultados) / aud) if aud else 0,
+        "distribucion": dist,
+        "peores": sorted(resultados, key=lambda r: (r["puntuacion"], -r["alta"]))[:10],
+        "reglas_frecuentes": reglas,
+        "resultados": resultados,  # detalle completo: el caller decide si va a archivo
+    }
+
+
+def cmd_auditar_todos(args):
+    token, usuario = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
+    entorno = args.entorno or entorno_por_defecto(token)
+    ag = auditar_tenant(token, entorno, progreso=not args.como_json)
+
+    detalle = None
+    if args.detalle:
+        Path(args.detalle).write_text(
+            json.dumps(ag["resultados"], ensure_ascii=False, indent=1), encoding="utf-8")
+        detalle = str(Path(args.detalle))
+
+    # resumen compacto = lo UNICO que lee el asistente (tamano fijo, no crece con el tenant)
+    resumen = {k: v for k, v in ag.items() if k != "resultados"}
+    resumen["usuario"] = usuario
+    if detalle:
+        resumen["detalle_archivo"] = detalle
+
+    if args.como_json:
+        print(json.dumps(resumen, ensure_ascii=False, indent=1))
+        return 0
+
+    d = ag["distribucion"]
+    print(f"AUDITORIA DEL TENANT — entorno {entorno}  (conectado como {usuario})")
+    print(f"Flujos auditados: {ag['auditados']}"
+          + (f"   |   No accesibles (otro dueno): {ag['no_accesibles']}" if ag["no_accesibles"] else ""))
+    print(f"Puntuacion media: {ag['puntuacion_media']}/100")
+    print(f"\nDistribucion:  🟢 ≥90: {d['verde']}   🟡 75-89: {d['amarillo']}   "
+          f"🟠 50-74: {d['naranja']}   🔴 <50: {d['rojo']}")
+    if ag["peores"]:
+        print("\nPeores (revisar primero):")
+        for r in ag["peores"]:
+            print(f"  {r['puntuacion']:>3}  {r['nombre'][:44]:<44}  "
+                  f"({r['alta']} ALTA, {r['media']} MEDIA)  {r['id']}")
+    if ag["reglas_frecuentes"]:
+        print("\nReglas mas incumplidas (foco de mejora global):")
+        for r in ag["reglas_frecuentes"]:
+            print(f"  {r['codigo']:<11} {r['titulo'][:46]:<46}  en {r['flujos']} flujo(s)")
+    if detalle:
+        print(f"\nDetalle completo por flujo: {detalle}")
+        print("(no lo cargues salvo que se pida un flujo puntual)")
+    else:
+        print("\nTip: agrega --detalle informe.json para guardar el detalle por flujo.")
+    return 0
+
+
 def _preparar_escritura(args, necesita_archivo=True):
     """Pasos comunes de escritura: token, entorno, definicion nueva y auditoria previa."""
     token, _ = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
@@ -699,6 +812,11 @@ def main():
     p.set_defaults(fn=cmd_corridas)
     p = sub.add_parser("auditar", help="Descargar un flujo y auditarlo"); comunes(p)
     p.add_argument("flow_id"); p.set_defaults(fn=cmd_auditar)
+    p = sub.add_parser("auditar-todos", help="Auditar TODOS los flujos del tenant (resumen compacto)")
+    comunes(p)
+    p.add_argument("--detalle", help="ruta .json donde guardar el detalle por flujo")
+    p.add_argument("--json", action="store_true", dest="como_json", help="salida estructurada (contrato estable)")
+    p.set_defaults(fn=cmd_auditar_todos)
 
     def escritura(p):
         comunes(p)

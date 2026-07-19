@@ -244,6 +244,32 @@ def main():
           _config.get("cuenta_activa") == "personal@contoso.com" and
           len(fake.get_accounts()) == 1)
 
+    # 12. auditoria del tenant (agregado token-minimal, sin per-flujo en el resumen)
+    import copy
+    malo = copy.deepcopy(FLUJO_LIMPIO)
+    malo["definition"]["actions"].pop("Catch")  # sin Catch -> PA-ERR-01 (ALTA)
+    pa_api.listar_flujos = lambda t, e: [
+        {"name": "f1", "properties": {"displayName": "Limpio",
+                                      "definition": FLUJO_LIMPIO["definition"],
+                                      "connectionReferences": FLUJO_LIMPIO.get("connectionReferences", {})}},
+        {"name": "f2", "properties": {"displayName": "Sin manejo de errores",
+                                      "definition": malo["definition"]}},
+        {"name": "f3", "properties": {"displayName": "De otro dueno"}},  # sin definicion
+    ]
+
+    def _obtener_falso(t, e, fid):
+        raise pa_api.PaApiError("otro dueno")  # f3 no accesible
+
+    pa_api.obtener_flujo = _obtener_falso
+    ag = pa_api.auditar_tenant("tok", "env", progreso=False)
+    check("tenant: 2 auditados, 1 no accesible",
+          ag["auditados"] == 2 and ag["no_accesibles"] == 1)
+    check("tenant: el flujo limpio cuenta como verde (>=90)", ag["distribucion"]["verde"] >= 1)
+    check("tenant: PA-ERR-01 aparece en reglas mas incumplidas",
+          any(r["codigo"] == "PA-ERR-01" for r in ag["reglas_frecuentes"]))
+    check("tenant: el resumen expone 'peores' pero el detalle va aparte",
+          "peores" in ag and "resultados" in ag)
+
     print("-" * 50)
     print("TODO OK" if not fallas else f"{len(fallas)} verificacion(es) fallida(s)")
     return 0 if not fallas else 1

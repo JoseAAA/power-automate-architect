@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.0] — 2026-07-20 · Auditoría de todo el tenant (token-mínima)
+
+### Agregado — `auditar-todos` (tablero de gobernanza)
+- Nuevo comando `pa_api.py auditar-todos [--entorno X] [--detalle f.json] [--json]`:
+  audita TODOS los flujos del entorno y devuelve un **resumen compacto** —
+  puntuación media, distribución 🟢🟡🟠🔴, peores 10, reglas más incumplidas.
+  Contrato `pa-architect/auditoria-tenant@1`.
+- **Diseño token-mínimo** (principio del proyecto): cada flujo se audita en
+  Python (0 tokens de IA); el asistente lee solo el resumen (tamaño fijo, no
+  crece con el tenant). El **detalle por flujo va a un archivo** (`--detalle`)
+  que el asistente NO carga salvo que se pida un flujo concreto. Auditar 1 o
+  500 flujos cuesta casi los mismos tokens.
+- Reutiliza `auditar_flujo.auditar()` por import (sin subprocess por flujo);
+  progreso por stderr para no ensuciar la salida. Prueba offline del agregado
+  en `evals/verificar_conector.py`. Verificado en vivo contra un tenant real.
+
 ## [1.1.0] — 2026-07-20 · Multi-cuenta + seguridad
 
 ### Agregado — varias cuentas de Microsoft (personal / empresa)
