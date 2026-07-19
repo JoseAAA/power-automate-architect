@@ -3,7 +3,10 @@
 pa_api.py - Conector local a Power Automate: UN login -> todos tus flujos.
 
 Uso:
-  python pa_api.py login [--device]        Inicia sesion (abre el navegador)
+  python pa_api.py login [--device]        Inicia sesion (o agrega otra cuenta)
+  python pa_api.py sesion                  A que cuenta(s) estas conectado
+  python pa_api.py cambiar-cuenta <correo> Cambia la cuenta activa (ej. la de tu empresa)
+  python pa_api.py logout [--todas]        Cierra la cuenta activa (o todas)
   python pa_api.py entornos                Lista tus entornos
   python pa_api.py flujos [--entorno ID]   Lista TODOS tus flujos (Mis flujos + soluciones)
   python pa_api.py flujo <flowId> [--guardar ruta.json]   Detalle/definicion de un flujo
@@ -120,14 +123,28 @@ def _app(client_id=None, tenant=None):
     )
 
 
-def _token_para(scopes, interactivo=False, device=False, client_id=None, tenant=None):
-    """Token delegado: silencioso si hay sesion; si no (y se pide), interactivo."""
-    app = _app(client_id, tenant)
+def _cuenta_activa(app):
+    """Cuenta MSAL activa: la de config 'cuenta_activa', o la primera si no hay match."""
     cuentas = app.get_accounts()
-    if cuentas:
-        r = app.acquire_token_silent(scopes, account=cuentas[0])
+    if not cuentas:
+        return None, cuentas
+    activa = (_cargar_config().get("cuenta_activa") or "").lower()
+    if activa:
+        for c in cuentas:
+            if str(c.get("username", "")).lower() == activa:
+                return c, cuentas
+    return cuentas[0], cuentas
+
+
+def _token_para(scopes, interactivo=False, device=False, client_id=None, tenant=None):
+    """Token delegado de la cuenta activa: silencioso si hay sesion; si no (y se
+    pide), interactivo. Devuelve (access_token, usuario)."""
+    app = _app(client_id, tenant)
+    cuenta, _cuentas = _cuenta_activa(app)
+    if cuenta:
+        r = app.acquire_token_silent(scopes, account=cuenta)
         if r and "access_token" in r:
-            return r["access_token"], cuentas[0].get("username", "?")
+            return r["access_token"], cuenta.get("username", "?")
     if not interactivo:
         raise PaApiError("No hay sesion activa. Corre primero:  python pa_api.py login")
     if device:
@@ -137,7 +154,7 @@ def _token_para(scopes, interactivo=False, device=False, client_id=None, tenant=
         print(flujo["message"])  # instrucciones: ir a microsoft.com/devicelogin con el codigo
         r = app.acquire_token_by_device_flow(flujo)
     else:
-        print("Abriendo el navegador para iniciar sesion con tu cuenta de trabajo...")
+        print("Abriendo el navegador para iniciar sesion con tu cuenta de Microsoft...")
         r = app.acquire_token_interactive(scopes=scopes, prompt="select_account", timeout=300)
     if "access_token" not in r:
         err = r.get("error_description") or r.get("error") or str(r)
@@ -147,8 +164,12 @@ def _token_para(scopes, interactivo=False, device=False, client_id=None, tenant=
                 "que apruebe, o (2) usar una app propia con --client-id (ver references/api-conexion.md).\n"
                 f"Detalle: {err[:300]}")
         raise PaApiError(f"Login fallido: {err[:400]}")
-    cuentas = app.get_accounts()
-    return r["access_token"], (cuentas[0].get("username", "?") if cuentas else "?")
+    # usuario de ESTA sesion (no 'la primera de la cache'): viene en el id_token
+    usuario = (r.get("id_token_claims") or {}).get("preferred_username")
+    if not usuario:
+        cuenta, _ = _cuenta_activa(app)
+        usuario = cuenta.get("username", "?") if cuenta else "?"
+    return r["access_token"], usuario
 
 
 # ---------------------------------------------------------------------------
@@ -394,6 +415,10 @@ def cmd_login(args):
         cfg["client_id"] = args.client_id
     if args.tenant:
         cfg["tenant"] = args.tenant
+    # si cambia la cuenta activa, olvidar el entorno cacheado (puede ser de otro tenant)
+    if str(cfg.get("cuenta_activa", "")).lower() != str(usuario).lower():
+        cfg.pop("entorno", None)
+    cfg["cuenta_activa"] = usuario
     _guardar_config(cfg)
     entornos = listar_entornos(token)
     predet = next((e["name"] for e in entornos
@@ -404,23 +429,84 @@ def cmd_login(args):
     print(f"\nSesion iniciada como: {usuario}")
     print(f"Entornos accesibles: {len(entornos)}"
           + (f"   (por defecto: {predet})" if predet else ""))
+    otras = [c.get("username") for c in _app(args.client_id, args.tenant).get_accounts()
+             if str(c.get("username", "")).lower() != str(usuario).lower()]
+    if otras:
+        print(f"Otras cuentas en sesion: {', '.join(otras)}   "
+              "(cambia con: python pa_api.py cambiar-cuenta <correo>)")
     print("Siguiente paso:  python pa_api.py flujos")
     return 0
 
 
-def cmd_logout(args):
-    if ARCHIVO_CACHE.exists():
-        ARCHIVO_CACHE.unlink()
-        print("Sesion local borrada (cache de tokens eliminada).")
+def cmd_sesion(args):
+    app = _app(args.client_id, args.tenant)
+    cuenta, cuentas = _cuenta_activa(app)
+    if not cuentas:
+        print("Sin sesion. Inicia con:  python pa_api.py login")
+        return 0
+    print(f"{len(cuentas)} cuenta(s) en sesion:\n")
+    for c in cuentas:
+        u = c.get("username", "?")
+        activa = "  <- activa" if c is cuenta else ""
+        print(f"  {u}{activa}")
+    if len(cuentas) > 1:
+        print("\nCambiar de cuenta:  python pa_api.py cambiar-cuenta <correo>")
     else:
+        print("\nAgregar otra cuenta (ej. la de tu empresa):  python pa_api.py login")
+    return 0
+
+
+def cmd_cambiar_cuenta(args):
+    app = _app(args.client_id, args.tenant)
+    cuentas = app.get_accounts()
+    match = [c for c in cuentas if str(c.get("username", "")).lower() == args.correo.lower()]
+    if not match:
+        disp = ", ".join(c.get("username", "?") for c in cuentas) or "(ninguna)"
+        raise PaApiError(f"No hay sesion para '{args.correo}'. Cuentas disponibles: {disp}. "
+                         "Para agregarla inicia sesion:  python pa_api.py login")
+    cfg = _cargar_config()
+    cfg["cuenta_activa"] = match[0].get("username")
+    cfg.pop("entorno", None)  # el entorno por defecto puede cambiar entre cuentas
+    _guardar_config(cfg)
+    print(f"Cuenta activa: {cfg['cuenta_activa']}")
+    print("Siguiente:  python pa_api.py flujos")
+    return 0
+
+
+def cmd_logout(args):
+    if args.todas:
+        if ARCHIVO_CACHE.exists():
+            ARCHIVO_CACHE.unlink()
+        cfg = _cargar_config()
+        cfg.pop("cuenta_activa", None)
+        cfg.pop("entorno", None)
+        _guardar_config(cfg)
+        print("Todas las sesiones borradas.")
+        return 0
+    app = _app(args.client_id, args.tenant)
+    cuenta, _cuentas = _cuenta_activa(app)
+    if not cuenta:
         print("No habia sesion local.")
+        return 0
+    app.remove_account(cuenta)
+    cfg = _cargar_config()
+    cfg.pop("entorno", None)
+    restantes = app.get_accounts()
+    cfg["cuenta_activa"] = restantes[0].get("username") if restantes else None
+    if not restantes:
+        cfg.pop("cuenta_activa", None)
+    _guardar_config(cfg)
+    msg = f"Sesion de {cuenta.get('username')} cerrada."
+    if restantes:
+        msg += f" Cuenta activa ahora: {cfg['cuenta_activa']}"
+    print(msg)
     return 0
 
 
 def cmd_entornos(args):
-    token, _ = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
+    token, usuario = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
     entornos = listar_entornos(token)
-    print(f"{len(entornos)} entorno(s):\n")
+    print(f"{len(entornos)} entorno(s)  (conectado como {usuario}):\n")
     for e in entornos:
         p = e.get("properties", {}) or {}
         marca = "  <- por defecto" if p.get("isDefault") else ""
@@ -436,17 +522,19 @@ def _estado_flujo(p):
 
 
 def cmd_flujos(args):
-    token, _ = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
+    token, usuario = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
     entorno = args.entorno or entorno_por_defecto(token)
     flujos = listar_flujos(token, entorno)
     flujos.sort(key=lambda f: str((f.get("properties", {}) or {}).get("displayName", "")).lower())
     if args.como_json:
-        print(json.dumps({"contrato": "pa-architect/flujos@1", "entorno": entorno,
+        print(json.dumps({"contrato": "pa-architect/flujos@1", "usuario": usuario,
+                          "entorno": entorno,
                           "flujos": [{"id": f.get("name"),
                                       "nombre": (f.get("properties", {}) or {}).get("displayName", "?"),
                                       "estado": _estado_flujo(f.get("properties", {}) or {})}
                                      for f in flujos]}, ensure_ascii=False, indent=1))
         return 0
+    print(f"Conectado como: {usuario}")
     print(f"{len(flujos)} flujo(s) en {entorno}:\n")
     print(f"  {'ESTADO':<10} {'FLUJO':<52} ID")
     for f in flujos:
@@ -587,10 +675,17 @@ def main():
         p.add_argument("--tenant", help="Tenant (guid o dominio); por defecto 'organizations'")
         p.add_argument("--client-id", help="App de Entra ID propia (si el tenant bloquea la first-party)")
 
-    p = sub.add_parser("login", help="Iniciar sesion");                 comunes(p)
+    p = sub.add_parser("login", help="Iniciar sesion (o agregar otra cuenta)");  comunes(p)
     p.add_argument("--device", action="store_true", help="usar codigo de dispositivo en vez de navegador")
     p.set_defaults(fn=cmd_login)
-    p = sub.add_parser("logout", help="Borrar la sesion local");        p.set_defaults(fn=cmd_logout)
+    p = sub.add_parser("sesion", help="Ver a que cuenta(s) estas conectado");    comunes(p)
+    p.set_defaults(fn=cmd_sesion)
+    p = sub.add_parser("cambiar-cuenta", help="Cambiar la cuenta activa");       comunes(p)
+    p.add_argument("correo", help="correo de una cuenta ya iniciada (ver 'sesion')")
+    p.set_defaults(fn=cmd_cambiar_cuenta)
+    p = sub.add_parser("logout", help="Cerrar la cuenta activa (--todas para todas)"); comunes(p)
+    p.add_argument("--todas", action="store_true", help="cerrar TODAS las cuentas")
+    p.set_defaults(fn=cmd_logout)
     p = sub.add_parser("entornos", help="Listar entornos");             comunes(p); p.set_defaults(fn=cmd_entornos)
     p = sub.add_parser("flujos", help="Listar todos mis flujos");       comunes(p)
     p.add_argument("--json", action="store_true", dest="como_json", help="salida estructurada (contrato estable)")

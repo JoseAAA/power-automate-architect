@@ -13,9 +13,31 @@ terceros.
 | `actualizar_catalogo.py` | Solo `api.github.com` (metadatos públicos, sin auth) | Ninguna |
 
 **Tokens.** Se guardan en caché local **cifrada con DPAPI de Windows**
-(`msal-extensions`) en `~/.power-automate-architect/`. Si el cifrado no está
-disponible, el script lo AVISA en pantalla. Nunca se imprimen ni se registran.
-`logout` borra la caché. Revocable en cualquier momento desde Entra ID.
+(`msal-extensions`; Keychain en macOS, libsecret en Linux) en
+`~/.power-automate-architect/`. Si el cifrado no está disponible, el script lo
+AVISA en pantalla. Nunca se imprimen ni se registran. `logout` borra la sesión.
+Revocable en cualquier momento desde Entra ID.
+
+**Varias cuentas (multi-tenant).** Puedes iniciar sesión en varias cuentas (ej.
+la personal y la de la empresa) y cambiar la activa con `cambiar-cuenta`. Esto
+**no abre ningún hueco**:
+- MSAL guarda los tokens **separados por cuenta**; cada llamada pide el token de
+  la cuenta activa y nunca expone el de otra. "Cambiar de cuenta" solo elige a
+  cuál pedirle token, no mezcla ni copia credenciales.
+- La caché cifrada es **por usuario de Windows**: dos personas en cuentas de
+  Windows distintas no comparten sesiones (no compartas la cuenta de Windows —
+  práctica estándar de empresa).
+- Al cambiar de cuenta o entrar a una nueva, se **olvida el entorno por defecto**
+  cacheado: una escritura no puede terminar en el tenant equivocado por error. Si
+  fuerzas un `--entorno` de otro tenant al que la cuenta activa no tiene acceso,
+  la API responde 403 (nada silencioso).
+- `config.json` guarda solo datos no secretos: id de entorno, client_id, tenant
+  y el correo activo. Sin tokens, sin contraseñas.
+
+**Recomendación para entornos corporativos estrictos:** registra tu propia app en
+Entra ID y úsala con `--client-id`. Da control de Conditional Access y una
+traza de auditoría a nombre de esa app, en vez del client público first-party de
+Microsoft que se usa por defecto (ver `references/api-conexion.md`).
 
 **Client ID.** Por defecto usa un client público *first-party de Microsoft*
 (`1950a258-…`, el mismo del módulo oficial `Microsoft.PowerApps.Administration.PowerShell`)

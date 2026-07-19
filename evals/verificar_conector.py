@@ -201,6 +201,49 @@ def main():
     check("preauditoria: limpio pasa (0) y con secreto bloquea (1)",
           cod_ok == 0 and cod_mal == 1, f"ok={cod_ok} mal={cod_mal}")
 
+    # 11. gestion multi-cuenta (sin red: MSAL simulado)
+    class _FakeApp:
+        def __init__(self, correos):
+            self._c = [{"username": u} for u in correos]
+
+        def get_accounts(self):
+            return list(self._c)
+
+        def remove_account(self, acc):
+            self._c = [c for c in self._c if c is not acc]
+
+    fake = _FakeApp(["personal@contoso.com", "empresa@bigcorp.com"])
+    pa_api._app = lambda *a, **k: fake
+
+    class _Args:
+        def __init__(self, **kw):
+            self.client_id = self.tenant = None
+            self.__dict__.update(kw)
+
+    _config.pop("cuenta_activa", None)
+    _config["entorno"] = "env-personal"
+    cuenta_def, _ = pa_api._cuenta_activa(fake)
+    check("sin cuenta activa -> primera cuenta", cuenta_def["username"] == "personal@contoso.com")
+
+    pa_api.cmd_cambiar_cuenta(_Args(correo="empresa@bigcorp.com"))
+    check("cambiar-cuenta fija la activa en config",
+          _config.get("cuenta_activa") == "empresa@bigcorp.com")
+    check("cambiar de cuenta olvida el entorno cacheado", "entorno" not in _config)
+    cuenta_emp, _ = pa_api._cuenta_activa(fake)
+    check("_cuenta_activa respeta la cuenta elegida", cuenta_emp["username"] == "empresa@bigcorp.com")
+
+    try:
+        pa_api.cmd_cambiar_cuenta(_Args(correo="noexiste@x.com"))
+        rechazo = False
+    except pa_api.PaApiError:
+        rechazo = True
+    check("cambiar-cuenta rechaza un correo sin sesion", rechazo)
+
+    pa_api.cmd_logout(_Args(todas=False))
+    check("logout cierra la activa y deja la otra como activa",
+          _config.get("cuenta_activa") == "personal@contoso.com" and
+          len(fake.get_accounts()) == 1)
+
     print("-" * 50)
     print("TODO OK" if not fallas else f"{len(fallas)} verificacion(es) fallida(s)")
     return 0 if not fallas else 1

@@ -31,6 +31,8 @@ ver `${CLAUDE_PLUGIN_ROOT}/references/contrato-agente.md`); no raspes el texto h
 ```bash
 python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" login            # abre el navegador (una vez)
 python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" login --device   # alternativa con código
+python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" sesion           # a qué cuenta(s) estás conectado
+python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" cambiar-cuenta <correo>  # cambiar de cuenta (ej. la de tu empresa)
 python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" entornos
 python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" flujos           # TODOS los flujos del usuario
 python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" flujo <ID> --guardar flujo.json
@@ -44,6 +46,10 @@ python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" auditar <ID>     # descarga + a
    `ERROR: No hay sesion activa` (exit 3), avisa al usuario que se abrirá el
    navegador para iniciar sesión con su cuenta de trabajo y corre `login`
    (espera hasta 5 min). Si el navegador no es viable, `login --device`.
+   - **Transparencia de cuenta:** `flujos`/`entornos` muestran "conectado como
+     &lt;correo&gt;". Menciónaselo al usuario. Si dice que sus flujos están en OTRA
+     cuenta (ej. la de la empresa), usa `login` para agregarla y luego
+     `cambiar-cuenta &lt;correo&gt;` (o `sesion` para ver las disponibles).
 2. **Listar.** `flujos` → presenta en lenguaje llano: cuántos hay, cuáles están
    apagados (`Stopped`) y sobre todo cuáles **Suspendido** (= bloqueados por
    política DLP: eso hay que decirlo claro). Ofrece auditar los importantes.
