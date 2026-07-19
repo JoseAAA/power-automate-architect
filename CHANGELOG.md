@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.1.0] — 2026-07-20 · Multi-cuenta + seguridad
+
+### Agregado — varias cuentas de Microsoft (personal / empresa)
+- Nuevos comandos en `pa_api.py`: **`sesion`** (a qué correo estás conectado),
+  **`cambiar-cuenta <correo>`** (cambia la cuenta activa, ej. la de tu empresa),
+  y `logout [--todas]` (cierra la activa, o todas). `login` ahora agrega cuentas
+  adicionales sin borrar las anteriores.
+- El token se pide para la **cuenta activa** (`config.cuenta_activa`), no "la
+  primera de la caché". `flujos`/`entornos` muestran **"conectado como X"** (y
+  un campo `usuario` en la salida `--json`).
+
+### Seguridad (revisión para uso en empresas)
+- Al cambiar de cuenta o entrar a una nueva se **olvida el entorno por defecto
+  cacheado** → una escritura no puede terminar en el tenant equivocado.
+- Tokens **separados por cuenta** en MSAL: cambiar de cuenta solo elige a cuál
+  pedir token, nunca mezcla ni expone credenciales de otra. Verificado: ningún
+  token se imprime ni se serializa; `config.json` solo guarda datos no secretos.
+- `SECURITY.md` amplía el modelo multi-tenant y recomienda registrar una app
+  propia con `--client-id` para entornos corporativos estrictos.
+- Prueba offline de la lógica de cuentas añadida a `evals/verificar_conector.py`.
+
+### Cambiado
+- Descripciones de `plugin.json` y `marketplace.json` actualizadas (sin el
+  conteo de reglas desactualizado; reflejan los 5 modos actuales).
+
 ## [1.0.0] — 2026-07-20 · Primera versión funcional
 
 ### Agregado — Copiloto (crear flujos, fácil)
