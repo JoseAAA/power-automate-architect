@@ -5,9 +5,9 @@ description: >
   USAR cuando el usuario sube o apunta a un flujo exportado (.zip de "exportar
   como paquete", una carpeta del paquete, o un definition.json / clientdata) y
   pide "audita mi flujo", "revisa este flujo", "esta bien hecho?", "que puedo
-  mejorar", "es eficiente?", "sigue las buenas practicas?". Entrega puntuacion,
-  hallazgos por severidad y el arreglo concreto de cada uno. NO usar para Power
-  Apps, Power BI ni Logic Apps de Azure puras.
+  mejorar", "es eficiente?", "sigue las buenas practicas?". NO usar para Power
+  Apps, Power BI, Logic Apps puras, ni para flujos del tenant sin exportar
+  (eso es pa-flujos).
 ---
 
 # Auditoria de un flujo de Power Automate
@@ -44,9 +44,12 @@ preguntas.
    - **Lo bueno:** menciona 1-2 cosas que el flujo ya hace bien (motiva).
    - Cierre con UNA oferta de accion: *"¿Quiero que te prepare los pasos para
      aplicar el arreglo #1?"* (no una bateria de preguntas).
-   - Para contexto/severidad real de cada regla, apoyate en
-     `${CLAUDE_PLUGIN_ROOT}/references/buenas-practicas.md` (codigos PA-xxx +
-     fuentes), pero NO lo vuelques entero: cita solo lo pertinente.
+   - Cargas condicionales (no cargues todo de una vez):
+
+     | Lee | Solo cuando |
+     |---|---|
+     | `${CLAUDE_PLUGIN_ROOT}/references/buenas-practicas.md` — con grep del codigo `PA-XXX-NN`, nunca entero | expliques el porque/contexto de una regla concreta |
+     | `${CLAUDE_PLUGIN_ROOT}/references/ia-en-flujos.md` | el reporte traiga hallazgos PA-IA-xx / PA-AGT-xx |
 
 4. **Si el usuario lo pide**, guia el arreglo paso a paso (clic a clic para
    no-expertos; expresion/JSON listo para experto). No edites el flujo en su

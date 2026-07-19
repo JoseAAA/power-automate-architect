@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.5.1] — 2026-07-18
+
+### Mejorado — eficiencia de tokens y anti-drift (estudio de skills-for-fabric, superpowers y ponytail)
+- **`AGENTS.md` adelgazado ~40%** (se paga en cada conversación vía el import de
+  `CLAUDE.md`): solo identidad, ruteo de modos, 4 reglas de oro y verificación;
+  el detalle vive en las skills, que se cargan al entrar al modo.
+- **Descriptions de las 4 skills = solo disparadores** (<550 chars, patrón
+  "USAR cuando…/NO usar…" de superpowers); los requisitos y resúmenes pasaron
+  al cuerpo.
+- **Tablas de carga condicional** ("Lee X solo cuando Y", patrón fabric) en las
+  skills: el catálogo se consulta con grep del código `PA-XXX-NN`, nunca entero.
+- **`pa-conectado`**: tabla anti-racionalización para la regla de confirmación
+  (urgencia ≠ OK, cada subida su propio OK) y **ledger de sesión** en disco para
+  sobrevivir compactación de contexto a mitad del ciclo de escritura.
+- **`pa-actualizar`**: TTL de 30 días (patrón check-updates de fabric) — no
+  re-chequear fuentes si se revisó hace poco.
+- **`evals/verificar_docs.py`** (patrón check-rule-copies de ponytail): espejo
+  `.agents/skills` sin drift, frases canario de la red de seguridad, conteo de
+  reglas del código == documentación, y límites de descriptions. 12/12.
+
+### Corregido
+- **El conteo real de reglas es 40, no 39** (el "14" inicial eran 15 y el error
+  se arrastró) — detectado al implementar el verificador de conteos. Corregido
+  en README, catálogo, backlog y CHANGELOG histórico.
+
 ## [0.5.0] — 2026-07-18
 
 ### Agregado — Fase 3: escritura por lenguaje natural + portabilidad multi-agente
@@ -26,7 +51,7 @@
 ## [0.4.0] — 2026-07-18
 
 ### Agregado — IA + actualizador permanente (fase 5)
-- **5 reglas de IA/agent flows** (39 en total), derivadas de la investigación de
+- **5 reglas de IA/agent flows** (40 en total), derivadas de la investigación de
   las "AI capabilities" del diseñador (ver `references/ia-en-flujos.md`):
   PA-IA-01 (salida de IA sin validación ni humano en el circuito), PA-IA-02
   (acción de IA dentro de un bucle: quema créditos), PA-IA-03 (INFO: consumo de
@@ -74,7 +99,7 @@
 ## [0.2.0] — 2026-07-16
 
 ### Agregado
-- **Catálogo ampliado de 14 → 34 reglas** en `scripts/auditar_flujo.py`, alineado con
+- **Catálogo ampliado de 15 → 35 reglas** en `scripts/auditar_flujo.py`, alineado con
   el Power CAT Tools Code Review de Microsoft. Nuevas: PA-CONC-01 (condición de
   carrera en bucles paralelos), PA-ERR-03 (Catch sin Terminate), PA-SEC-03 (secure
   inputs/outputs), PA-SEC-04 (trigger HTTP sin restricción), PA-TEST-01 (static

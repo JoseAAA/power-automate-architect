@@ -7,7 +7,6 @@ description: >
   flujos", "qué flujos tengo", "audita mi flujo X" (sin adjuntar archivo),
   "por qué falló mi flujo", "muéstrame las corridas", "descarga la definición",
   "inicia sesión". NO modifica ni despliega flujos (para eso: pa-conectado).
-  Requiere: pip install msal msal-extensions requests.
 ---
 
 # Modo conectado (lectura) — todos los flujos con un solo login
@@ -23,6 +22,8 @@ solución), descarga definiciones, muestra corridas y audita contra el catálogo
 - El análisis de reglas corre 100% local (`auditar_flujo.py`).
 
 ## Comandos (todos vía `${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py`)
+
+Requisito único: `pip install msal msal-extensions requests` (si falta, instálalo).
 
 ```bash
 python "${CLAUDE_PLUGIN_ROOT}/scripts/pa_api.py" login            # abre el navegador (una vez)

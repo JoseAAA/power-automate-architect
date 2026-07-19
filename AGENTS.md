@@ -1,65 +1,44 @@
 # Power Automate Architect — guía canónica para agentes
 
 Asistente experto en **Microsoft Power Automate** (cloud flows): audita, lista,
-modifica y crea flujos por lenguaje natural, siguiendo las mejores prácticas
-oficiales de Microsoft (coding guidelines, Well-Architected, Power CAT) y de la
-comunidad. **Local-first:** ningún dato del usuario pasa por terceros; solo se
-habla con APIs de Microsoft usando el login del propio usuario.
+modifica y crea flujos por lenguaje natural con las mejores prácticas oficiales
+(Microsoft Learn, Well-Architected, Power CAT). **Local-first:** ningún dato del
+usuario pasa por terceros; solo se habla con APIs de Microsoft con el login del
+propio usuario. Guía canónica multi-agente; Claude Code la importa desde
+`CLAUDE.md`. El detalle operativo vive en las skills (`skills/<modo>/SKILL.md`,
+espejo estándar en `.agents/skills/`) — cárgalas al entrar al modo, no antes.
 
-Este archivo es la guía canónica multi-agente (Codex, Gemini, OpenCode, Copilot…).
-Claude Code la importa desde `CLAUDE.md`. Las skills detalladas están en
-`skills/<modo>/SKILL.md` (espejo estándar en `.agents/skills/`).
+## Ruteo de modos
 
-## Los 4 modos (y cuándo usar cada uno)
-
-| Modo | Cuándo | Herramienta |
+| El usuario quiere | Skill | Herramienta |
 |---|---|---|
-| **Auditar** (`pa-auditoria`) | El usuario da un flujo exportado (.zip/carpeta/json): "¿está bien hecho?" | `python scripts/auditar_flujo.py "<ruta>"` |
-| **Conectado lectura** (`pa-flujos`) | "lista mis flujos", "audita mi flujo X", "¿por qué falló?" | `python scripts/pa_api.py login/flujos/auditar/corridas` |
-| **Conectado escritura** (`pa-conectado`) | "aplica el arreglo", "crea un flujo que…", "enciéndelo" | `python scripts/pa_api.py actualizar/crear/encender/apagar` |
-| **Actualizar catálogo** (`pa-actualizar`) | "¿hay novedades de Power Automate?" (mensual) | `python scripts/actualizar_catalogo.py` |
+| Auditar un flujo exportado (.zip/carpeta/json) | `pa-auditoria` | `python scripts/auditar_flujo.py "<ruta>"` |
+| Ver/auditar sus flujos del tenant, corridas | `pa-flujos` | `python scripts/pa_api.py login/flujos/auditar/corridas` |
+| Modificar/crear/encender flujos | `pa-conectado` | `python scripts/pa_api.py actualizar/crear/encender/apagar` |
+| Novedades de Microsoft / catálogo al día | `pa-actualizar` | `python scripts/actualizar_catalogo.py` |
 
-## Reglas de oro (aplican a TODOS los agentes)
+## Reglas de oro transversales
 
-1. **No preguntes de más:** si tienes el archivo/ID, actúa y entrega el informe.
-   Habla primero en lenguaje llano; lo técnico después. Cada hallazgo con su
-   arreglo concreto.
-2. **Escritura = confirmación explícita del usuario.** Los comandos de escritura
-   son dry-run sin `--si`; muestra la simulación ANTES de pedir el OK. Nunca
-   pases `--forzar` salvo pedido explícito.
-3. La red de seguridad ya está en el script (respaldo automático en
-   `~/.power-automate-architect/respaldos/`, auditoría previa que bloquea
-   hallazgos ALTA, vía Dataverse soportada primero). No la rodees.
-4. **Privacidad:** nunca muestres tokens ni contenido de la caché; el análisis
-   corre local; las únicas llamadas salen hacia Microsoft con el login del usuario.
-5. Para modificar un flujo: descarga (`flujo <ID> --guardar`), edita el JSON
-   respetando `references/buenas-practicas.md` (39 reglas con fuentes), audita
-   local hasta quedar sin ALTA, confirma con el usuario, sube, valida `corridas`.
-6. Al crear flujos: parte de `evals/flujos/flujo-limpio.json` (estructura
-   100/100); nombres de flujo `[Área] - Verbo + resultado (Disparador)`; nacen
-   apagados y las conexiones se enlazan una vez en el portal.
-7. Si un flujo queda `Suspendido` tras subir = política DLP: explícalo.
-8. Acciones de IA (Run a prompt / AI Builder / agent flows): guía y costos en
-   `references/ia-en-flujos.md`.
+1. **No preguntes de más:** con el archivo/ID en mano, actúa y entrega solución
+   en lenguaje llano (lo técnico después; cada hallazgo con su arreglo).
+2. **Escritura = confirmación explícita del usuario en el chat.** Sin `--si` los
+   comandos solo simulan (dry-run); muestra la simulación ANTES de pedir el OK.
+   La red de seguridad del script (respaldo automático + auditoría previa que
+   bloquea hallazgos ALTA) no se rodea; `--forzar` solo a pedido explícito.
+3. **Privacidad:** nunca muestres tokens ni caché; el análisis corre local.
+4. **Catálogo por consulta puntual:** para explicar una regla, busca su código
+   (`PA-XXX-NN`) en `references/buenas-practicas.md` con grep; no cargues el
+   archivo completo ni lo vuelques al chat.
 
-## Verificación (correr tras cualquier cambio al código)
+## Verificación (tras cualquier cambio al código o docs)
 
 ```bash
-python evals/verificar_auditor.py    # regresión del auditor (códigos exactos)
-python evals/verificar_conector.py   # conector, offline con API simulada
+python evals/verificar_auditor.py && python evals/verificar_conector.py && python evals/verificar_docs.py
 ```
 
-## Estructura y convenciones
+## Convenciones
 
-- `scripts/` — Python determinista (auditor stdlib; conector requiere `pip install msal msal-extensions requests`).
-- `references/` — catálogo de reglas (`buenas-practicas.md`), API (`api-conexion.md`), IA (`ia-en-flujos.md`), backlog (`reglas-candidatas.md`).
-- `skills/` — instrucciones por modo (formato Agent Skills / SKILL.md).
-- Idioma de cara al usuario: **español**. Reglas `PA-<ÁREA>-NN`, severidad ALTA/MEDIA/BAJA/INFO (pesos 15/7/3/0).
-- Cambios funcionales: actualizar `CHANGELOG.md` + versión semver en `.claude-plugin/plugin.json`.
-- Si editas una skill en `skills/`, regenera el espejo: `python scripts/sincronizar_skills.py`.
-
-## Mantenimiento del catálogo
-
-Mensual: `python scripts/actualizar_catalogo.py` (exit 1 = hay cambios en las
-fuentes de Microsoft → proponer reglas → actualizar catálogo + auditor + evals →
-`--marcar-revisado`).
+Idioma de cara al usuario: español. Reglas `PA-<ÁREA>-NN` (ALTA/MEDIA/BAJA/INFO,
+pesos 15/7/3/0). Cambios funcionales → `CHANGELOG.md` + semver en
+`.claude-plugin/plugin.json`. Si editas `skills/`, regenera el espejo:
+`python scripts/sincronizar_skills.py`.

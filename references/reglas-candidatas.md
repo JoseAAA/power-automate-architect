@@ -1,4 +1,4 @@
-# Reglas candidatas para ampliar el catálogo (14 → ~44)
+# Reglas candidatas para ampliar el catálogo (15 → ~45)
 
 > `investigado: 2026-07-15` · Fuente de calibración principal: **Power CAT Tools –
 > Code Review Tool** (Microsoft, [GitHub](https://github.com/microsoft/Power-CAT-Tools)),
@@ -14,7 +14,7 @@ PA-ERR-02 · #16→PA-ERR-03 · #18→PA-PERF-11 · #19→PA-SIZE-01 · #20→PA
 #21→PA-VAR-01 · #22→PA-VAR-02 · #24→PA-DOC-02 · #25→PA-PERF-12 · #28→PA-LIC-01.
 
 **Adición 2026-07-18 (investigación de AI capabilities, ver `ia-en-flujos.md`):**
-PA-IA-01/02/03 y PA-AGT-01/02 implementadas (39 reglas). Pendientes de IA: manejo
+PA-IA-01/02/03 y PA-AGT-01/02 implementadas (40 reglas). Pendientes de IA: manejo
 de error por acción de IA (cuota/moderación/timeout 2 min — hoy lo cubre el
 Try/Catch global), detección de "Run a generative action" (firma JSON desconocida,
 preview) y detección del modelo usado (Claude/Grok externos — el modelo vive en el

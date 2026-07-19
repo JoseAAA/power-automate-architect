@@ -10,11 +10,15 @@ description: >
 
 # Actualizador del catálogo — novedades de las fuentes oficiales
 
-Objetivo: que las 34+ reglas y las recomendaciones del plugin nunca se queden
-atrás de Microsoft. El trabajo pesado lo hace un script determinista; el
+Objetivo: que las reglas del catálogo y las recomendaciones del plugin nunca se
+queden atrás de Microsoft. El trabajo pesado lo hace un script determinista; el
 asistente solo interpreta los cambios y propone reglas.
 
 ## Procedimiento
+
+0. **TTL — no re-chequear en vano:** si `references/estado-fuentes.json` muestra
+   última revisión hace **menos de 30 días** y el usuario no pidió el chequeo
+   explícitamente, responde "catálogo al día (revisado el <fecha>)" y termina.
 
 1. **Detectar cambios** (1 llamada HTTP pública por fuente, sin credenciales):
    ```bash

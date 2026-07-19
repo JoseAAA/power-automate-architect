@@ -83,7 +83,7 @@ python scripts/auditar_flujo.py "ruta/al/flujo.zip"   # auditar un flujo
 python evals/verificar_auditor.py                     # regresión del auditor
 ```
 
-El catálogo tiene **39 reglas automatizadas** (severidad ALTA/MEDIA/BAJA/INFO),
+El catálogo tiene **40 reglas automatizadas** (severidad ALTA/MEDIA/BAJA/INFO),
 alineadas con el Power CAT Tools Code Review de Microsoft. Ver
 `references/buenas-practicas.md`.
 
@@ -98,7 +98,7 @@ power-automate-architect/
 │   ├── pa-actualizar/     vigilante del catálogo (novedades de Microsoft)
 │   └── pa-conectado/      despliegue vía pac CLI (en evolución)
 ├── scripts/
-│   ├── auditar_flujo.py        analizador determinista, 39 reglas
+│   ├── auditar_flujo.py        analizador determinista, 40 reglas
 │   ├── pa_api.py               conector (MSAL + maker API, solo lectura)
 │   └── actualizar_catalogo.py  vigila las fuentes oficiales (GitHub)
 ├── evals/

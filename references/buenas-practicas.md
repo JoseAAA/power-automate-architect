@@ -1,6 +1,6 @@
 # Catálogo de reglas y mejores prácticas — Power Automate Architect
 
-> `actualizado: 2026-07-18` · **39 reglas automatizadas** en `scripts/auditar_flujo.py`.
+> `actualizado: 2026-07-18` · **40 reglas automatizadas** en `scripts/auditar_flujo.py`.
 > Fuentes normativas: **Microsoft Learn – Coding guidelines for cloud flows** (26
 > páginas), **Power Platform Well-Architected** y el **Power CAT Tools – Code Review**
 > de Microsoft (estándar de facto de revisión automatizada). Cómo refrescar: sección
