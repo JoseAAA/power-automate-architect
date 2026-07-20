@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.0] — 2026-07-20 · Copiloto plan-primero (crear flujos en conjunto)
+
+### Agregado — modo plan-primero (patrón OpenSpec/superpowers)
+- `pa-copiloto` ahora tiene DOS caminos: **rápido** (flujo simple → plantilla, 2-3
+  preguntas) y **guiado/plan-primero** (flujo no trivial: descubrir → plan escrito
+  → iterar hasta aprobar → construir). El plan es un artefacto en disco
+  (`~/.power-automate-architect/planes/<slug>.md`) que el usuario y la IA iteran;
+  nada se construye hasta `estado: APROBADO` (gate propose→approve→apply de
+  OpenSpec; artefacto que sobrevive a compactación, de superpowers).
+- Plantilla del plan: `skills/pa-copiloto/plantillas/_plan-de-flujo.md` (objetivo,
+  disparador, fuentes, pasos, conectores, datos, validación humana, errores,
+  preguntas abiertas, riesgos, fuera de alcance).
+
 ## [1.6.0] — 2026-07-20 · Crear en formato moderno (connection references)
 
 ### Corregido — los flujos creados abrían en el diseñador clásico

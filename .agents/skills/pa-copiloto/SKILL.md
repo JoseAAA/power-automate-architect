@@ -8,10 +8,58 @@ description: >
   flujos existentes (pa-conectado) ni para auditar (pa-auditoria / pa-flujos).
 ---
 
-# Copiloto — de la idea al flujo funcionando, fácil
+# Copiloto — de la idea al flujo funcionando
 
 Objetivo: que CUALQUIER persona cree un flujo bien hecho **sin saber qué es un
-JSON**. Propón, no interrogues: máximo 2-3 preguntas y siempre con opciones.
+JSON**. Hay DOS caminos según la complejidad — elige al entrar:
+
+- **Rápido** (flujo simple y claro: 1 disparador, 1-2 acciones, encaja en una
+  plantilla): sigue los Pasos 1-5 tal cual. Máximo 2-3 preguntas.
+- **Guiado / plan-primero** (flujo NO trivial: varias fuentes, extracción de
+  datos, decisiones de negocio, o el usuario quiere "armarlo juntos e iterar"):
+  usa el **Modo plan-primero** de abajo ANTES de construir. Ej: ingesta de
+  facturas, integraciones multi-sistema, algo con IA/documentos.
+
+Ante la duda o si el usuario dice "vamos armándolo/iterando", usa plan-primero.
+
+---
+# Modo plan-primero (colaborativo e iterativo)
+
+Patrón: **descubrir → plan escrito → iterar hasta aprobar → construir**. El plan
+es el contrato (como una propuesta de OpenSpec): nada se construye hasta que el
+usuario diga "apruébalo".
+
+### P1 — Descubrir (preguntas que importan, no interrogatorio)
+Haz las preguntas necesarias para entender de verdad (disparador, fuentes,
+formato de los datos, transformaciones, destino, quién valida, volumen, manejo de
+errores). Agrupa; ofrece opciones. Es correcto hacer MÁS de 3 preguntas aquí si
+el flujo lo amerita — pero explica por qué cada una importa.
+
+### P2 — Investigar si hace falta
+Si algo no es obvio (¿qué conector extrae de un PDF? ¿el XML ya trae todo?
+¿es premium?), investígalo antes de prometerlo. No inventes conectores/acciones.
+Consulta `references/` (ia-en-flujos, api-conexion,
+buenas-practicas). Si sigue sin estar claro, dilo como pregunta abierta en el plan.
+
+### P3 — Escribir el plan (artefacto en disco)
+Copia `skills/pa-copiloto/plantillas/_plan-de-flujo.md` a
+`~/.power-automate-architect/planes/<slug>.md` y complétalo con lo que sabes.
+Muéstraselo al usuario en lenguaje llano (objetivo → disparador → pasos → validación
+→ preguntas abiertas). `estado: BORRADOR`.
+
+### P4 — Iterar
+Ajusta el plan con el feedback del usuario, ronda por ronda, hasta que esté de
+acuerdo. Resuelve las "preguntas abiertas". Actualiza el archivo cada ronda (así
+sobrevive a compactación de contexto). No pases a construir con preguntas abiertas.
+
+### P5 — Aprobar y construir
+Cuando el usuario apruebe explícitamente, marca `estado: APROBADO` en el plan y
+recién ahí genera la definición y sigue los **Pasos 2-5** de abajo (plantilla o
+construcción a medida → nombres descriptivos → auditar 100 → crear moderno →
+poner a andar). Mantén el plan como registro.
+
+---
+# Camino rápido (flujos simples)
 
 ## Paso 1 — Entender (máx. 2-3 preguntas, con opciones)
 Falta algo, pregunta SOLO lo esencial: ¿cuándo corre? (llega un item / horario /
