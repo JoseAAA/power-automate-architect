@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.1] — 2026-07-20 · Copiloto presenta todas las opciones (gratis y premium)
+
+### Mejorado
+- `pa-copiloto` ahora tiene la regla explícita de **no limitarse a conectores
+  gratis/estándar ni asumir cuenta free**: en cada decisión con alternativas
+  presenta el menú completo (estándar y premium — `HTTP` a APIs externas como
+  OpenAI, AI Builder, conectores premium, custom connectors) con su
+  costo/licencia y trade-off, y deja que el usuario elija de forma informada.
+
 ## [1.7.0] — 2026-07-20 · Copiloto plan-primero (crear flujos en conjunto)
 
 ### Agregado — modo plan-primero (patrón OpenSpec/superpowers)

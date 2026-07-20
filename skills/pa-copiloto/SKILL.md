@@ -35,11 +35,23 @@ formato de los datos, transformaciones, destino, quién valida, volumen, manejo 
 errores). Agrupa; ofrece opciones. Es correcto hacer MÁS de 3 preguntas aquí si
 el flujo lo amerita — pero explica por qué cada una importa.
 
-### P2 — Investigar si hace falta
-Si algo no es obvio (¿qué conector extrae de un PDF? ¿el XML ya trae todo?
-¿es premium?), investígalo antes de prometerlo. No inventes conectores/acciones.
-Consulta `${CLAUDE_PLUGIN_ROOT}/references/` (ia-en-flujos, api-conexion,
-buenas-practicas). Si sigue sin estar claro, dilo como pregunta abierta en el plan.
+### P2 — Investigar y presentar TODAS las opciones (gratis Y premium)
+Si algo no es obvio (¿qué conector extrae de un PDF? ¿el XML ya trae todo?),
+investígalo antes de prometerlo. No inventes conectores/acciones. Consulta
+`${CLAUDE_PLUGIN_ROOT}/references/` (ia-en-flujos, api-conexion, buenas-practicas).
+
+**NO te limites a conectores gratis/estándar ni asumas una cuenta free.** Para
+cada decisión con alternativas, presenta el **menú completo** con su trade-off y
+deja que el usuario elija:
+- opción **estándar/gratis** (si existe) — ej. leer XML con `xpath()`, condiciones;
+- opción **premium** — ej. acción `HTTP` para pegarle a una API externa (OpenAI,
+  el ERP, etc.), AI Builder para extraer de PDF/imágenes, conectores premium
+  (Encodian, SQL, Dataverse), custom connector;
+- indica de cada una: qué necesita (licencia premium por usuario/proceso,
+  créditos de IA, custom connector) y cuándo conviene.
+
+El objetivo es **construir CON el usuario informándole las opciones**, no elegir
+por él la más barata. Si sigue sin estar claro, ponlo como pregunta abierta.
 
 ### P3 — Escribir el plan (artefacto en disco)
 Copia `${CLAUDE_PLUGIN_ROOT}/skills/pa-copiloto/plantillas/_plan-de-flujo.md` a
@@ -110,5 +122,9 @@ ninguna, salta directo a encenderlo.
 ## Reglas
 - Nunca entregues un flujo que no audite 🟢 (≥90); ideal 100.
 - No inventes operationId/apiId: usa los de las plantillas o de flujos reales.
-- Acciones de IA solo si aportan (ver `${CLAUDE_PLUGIN_ROOT}/references/ia-en-flujos.md`):
-  lógica determinista se hace con condiciones, no con prompts.
+- **Presenta todas las opciones (estándar y premium) con su costo/licencia; el
+  usuario decide.** No descartes premium (HTTP a una API, AI Builder, conectores
+  premium) por asumir cuenta free — solo infórmale el trade-off.
+- IA/premium cuando aporten (ver `${CLAUDE_PLUGIN_ROOT}/references/ia-en-flujos.md`):
+  para lógica determinista, condiciones antes que prompts — pero si el usuario
+  quiere IA/una API externa, es su decisión informada.
