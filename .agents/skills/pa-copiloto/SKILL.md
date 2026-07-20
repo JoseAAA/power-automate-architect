@@ -30,11 +30,15 @@ aprobar / guardar). Si el usuario ya lo dijo, NO re-preguntes.
 Rutas: `skills/pa-copiloto/plantillas/`.
 
 ## Paso 3 — Personalizar y auditar
-1. Copia la plantilla a un archivo de trabajo y adapta: nombre
+1. Copia la plantilla a un archivo de trabajo y adapta: nombre del flujo
    `[Área] - Verbo + resultado (Disparador)`, textos en español, fuentes de
    datos reales del usuario. Mantén los `@parameters('X (demo_Y)')` como
    variables de entorno y explícale que se configuran al importar.
-2. Audita hasta 100: `python "scripts/auditar_flujo.py" trabajo.json --json`
+2. **Nombra CADA acción de forma descriptiva en español** (PA-NAME-01): nunca
+   dejes "Compose", "Condition_2", "Apply to each" genéricos — usa "Listar
+   contratos por vencer", "¿Faltan 30 días?", etc. Un flujo se lee por sus
+   nombres de pasos.
+3. Audita hasta 100: `python "scripts/auditar_flujo.py" trabajo.json --json`
 
 ## Paso 4 — Crear (con confirmación)
 Muestra el plan en simple (cuándo corre → qué hace → a quién avisa) y con el OK
@@ -42,12 +46,18 @@ del usuario:
 ```bash
 python "scripts/pa_api.py" crear --archivo trabajo.json --nombre "..." --si
 ```
-(sin sesión: primero `login`; sin `--si` muestra la simulación — enséñala).
+Se crea en **formato moderno** (flujo de solución + connection references): abre
+en el diseñador nuevo y cumple PA-SEC-02. El plugin enlaza solo las conexiones
+que el usuario ya tenga; las que falten se autorizan una vez (ver Paso 5). Sin
+sesión: primero `login`; sin `--si` muestra la simulación — enséñala.
+(Solo si el usuario lo pide: `--clasico` crea sin solución, diseñador antiguo.)
 
 ## Paso 5 — Ponerlo a andar (manos del usuario)
-El flujo nace APAGADO. Dile: 1) abre el flujo en make.powerautomate.com y
-enlaza las conexiones (un clic por conector), 2) vuelve y dime "enciéndelo"
-(`encender <ID> --si`), 3) valídalo con `corridas <ID>`.
+El flujo nace APAGADO. El comando te dice qué conexiones quedaron **sin enlazar**
+(las que el usuario no tenía). Dile: 1) abre el flujo en make.powerautomate.com,
+autoriza ESAS connection references (una vez cada una), 2) vuelve y dime
+"enciéndelo" (`encender <ID> --si`), 3) valídalo con `corridas <ID>`. Si no faltó
+ninguna, salta directo a encenderlo.
 
 ## Reglas
 - Nunca entregues un flujo que no audite 🟢 (≥90); ideal 100.

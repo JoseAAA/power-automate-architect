@@ -93,6 +93,21 @@ def _http_falso(metodo, url, token, cuerpo=None, intentos=3, cabeceras=None, con
         CAPTURADO["post_dv"] = (url, cuerpo, cabeceras)
         return ({}, {"OData-EntityId": f"{DV_API}/api/data/v9.2/workflows(nuevo-guid-0001)"}) \
             if con_cabeceras else {}
+    # --- Dataverse: solucion / publisher / connection references (formato moderno) ---
+    if metodo == "GET" and f"{DV_API}/api/data/v9.2/solutions?" in url:
+        return {"value": []}  # no existe -> se crea
+    if metodo == "GET" and f"{DV_API}/api/data/v9.2/publishers?" in url:
+        return {"value": []}
+    if metodo == "GET" and f"{DV_API}/api/data/v9.2/connectionreferences?" in url:
+        return {"value": []}
+    if metodo == "POST" and url == f"{DV_API}/api/data/v9.2/publishers":
+        return ({}, {"OData-EntityId": f"{DV_API}/api/data/v9.2/publishers(pub-1)"})
+    if metodo == "POST" and url == f"{DV_API}/api/data/v9.2/solutions":
+        CAPTURADO["post_sol"] = (url, cuerpo, cabeceras)
+        return ({}, {"OData-EntityId": f"{DV_API}/api/data/v9.2/solutions(sol-1)"})
+    if metodo == "POST" and url == f"{DV_API}/api/data/v9.2/connectionreferences":
+        CAPTURADO.setdefault("post_connref", []).append((url, cuerpo, cabeceras))
+        return ({}, {"OData-EntityId": f"{DV_API}/api/data/v9.2/connectionreferences(cr-1)"})
     # --- escrituras maker (fallback legacy / entorno sin Dataverse) ---
     if metodo == "PATCH" and "/flows/FLOWLEGACY?" in url:
         CAPTURADO["patch_maker"] = (url, cuerpo, cabeceras)
@@ -302,6 +317,34 @@ def main():
           salud["suspendidos_total"] == 1 and salud["suspendidos"][0]["motivo"] == "CompanyDlpViolation")
     check("salud: reparto de estados correcto",
           salud["estados"]["Started"] == 2 and salud["estados"]["Suspended"] == 1)
+
+    # 14. creacion en FORMATO MODERNO (solucion + connection references, Shape B)
+    pa_api.listar_conexiones = lambda t, e: [  # solo SharePoint tiene conexion -> se pre-enlaza
+        {"name": "conn-sp-real", "properties": {"displayName": "SP",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+            "statuses": [{"status": "Connected"}]}},
+    ]
+    CAPTURADO.pop("post_connref", None)
+    res_m = pa_api.crear_flujo_moderno(
+        tok, "Default-tenant1", "Flujo moderno demo",
+        FLUJO_LIMPIO["definition"], FLUJO_LIMPIO.get("connectionReferences", {}))
+    cd_m = json.loads((CAPTURADO.get("post_dv", ("", {}, {}))[1] or {}).get("clientdata", "{}"))
+    cr_m = cd_m.get("properties", {}).get("connectionReferences", {})
+    hdr_wf = CAPTURADO.get("post_dv", ("", {}, {}))[2] or {}
+    check("moderno: via solución", res_m.get("via", "").startswith("dataverse (solución"))
+    check("moderno: clientdata usa Shape B (connectionReferenceLogicalName)",
+          all("connectionReferenceLogicalName" in (v.get("connection") or {})
+              for v in cr_m.values()) and len(cr_m) >= 1)
+    check("moderno: el POST del flujo lleva MSCRM.SolutionUniqueName",
+          hdr_wf.get("MSCRM.SolutionUniqueName") == pa_api.SOL_UNIQUE)
+    check("moderno: la connection reference se crea en la solución",
+          any((c[2] or {}).get("MSCRM.SolutionUniqueName") == pa_api.SOL_UNIQUE
+              for c in CAPTURADO.get("post_connref", [])))
+    check("moderno: SharePoint (con conexión) se pre-enlaza; Office365 queda por autorizar",
+          res_m.get("conexiones_sin_enlazar") == ["shared_office365"])
+    check("moderno: la connref de SharePoint lleva connectionid enlazado",
+          any((c[1] or {}).get("connectionid") == "conn-sp-real"
+              for c in CAPTURADO.get("post_connref", [])))
 
     print("-" * 50)
     print("TODO OK" if not fallas else f"{len(fallas)} verificacion(es) fallida(s)")

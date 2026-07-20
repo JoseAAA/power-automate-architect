@@ -397,6 +397,111 @@ def crear_flujo(token, entorno, nombre, defn, connrefs=None, client_id=None, ten
     return {"via": "maker API", "workflowid": r.get("name", "?")}
 
 
+# ---------------------------------------------------------------------------
+# Creacion en FORMATO MODERNO: flujo de solucion + connection references, para
+# que abra en el disenador nuevo y cierre PA-SEC-02. Ver references/api-conexion.md.
+# ---------------------------------------------------------------------------
+SOL_UNIQUE = "PowerAutomateArchitect"
+SOL_FRIENDLY = "Power Automate Architect"
+PUB_UNIQUE = "paarchitect"
+PUB_PREFIX = "pak"
+
+
+def _dv_get(tok_dv, api, ruta):
+    return _http("GET", f"{api}/api/data/v9.2/{ruta}", tok_dv)
+
+
+def _dv_post(tok_dv, api, entity, cuerpo, solucion=None):
+    cab = {"MSCRM.SolutionUniqueName": solucion} if solucion else None
+    _datos, headers = _http("POST", f"{api}/api/data/v9.2/{entity}", tok_dv, cuerpo,
+                            cabeceras=cab, con_cabeceras=True)
+    ent = str(headers.get("OData-EntityId", ""))
+    return ent[ent.rfind("(") + 1: ent.rfind(")")] if "(" in ent else None
+
+
+def _asegurar_solucion(tok_dv, api):
+    """Devuelve (unique_name, prefijo) de la solucion dedicada, creandola si falta."""
+    r = _dv_get(tok_dv, api, f"solutions?$filter=uniquename eq '{SOL_UNIQUE}'&$select=solutionid")
+    pr = _dv_get(tok_dv, api, f"publishers?$filter=uniquename eq '{PUB_UNIQUE}'"
+                              "&$select=publisherid,customizationprefix")
+    pub = (pr.get("value") or [None])[0]
+    if r.get("value") and pub:
+        return SOL_UNIQUE, pub.get("customizationprefix", PUB_PREFIX)
+    if not pub:
+        pid = _dv_post(tok_dv, api, "publishers", {
+            "uniquename": PUB_UNIQUE, "friendlyname": SOL_FRIENDLY,
+            "customizationprefix": PUB_PREFIX, "customizationoptionvalueprefix": 72000})
+        prefijo = PUB_PREFIX
+    else:
+        pid, prefijo = pub["publisherid"], pub.get("customizationprefix", PUB_PREFIX)
+    if not r.get("value"):
+        _dv_post(tok_dv, api, "solutions", {
+            "uniquename": SOL_UNIQUE, "friendlyname": SOL_FRIENDLY, "version": "1.0.0.0",
+            "publisherid@odata.bind": f"/publishers({pid})"})
+    return SOL_UNIQUE, prefijo
+
+
+def _asegurar_connref(tok_dv, api, solucion, prefijo, conector, connection_id=None):
+    """Asegura una connection reference para el conector; devuelve su logical name.
+    Si connection_id viene, la deja enlazada (el flujo se puede encender sin tocar el portal)."""
+    logical = f"{prefijo}_{conector}".lower().replace('-', '_')
+    r = _dv_get(tok_dv, api, "connectionreferences?$filter=connectionreferencelogicalname eq "
+                             f"'{logical}'&$select=connectionreferenceid")
+    if not r.get("value"):
+        cuerpo = {"connectionreferencelogicalname": logical,
+                  "connectionreferencedisplayname": conector,
+                  "connectorid": f"/providers/Microsoft.PowerApps/apis/{conector}"}
+        if connection_id:
+            cuerpo["connectionid"] = connection_id
+        _dv_post(tok_dv, api, "connectionreferences", cuerpo, solucion=solucion)
+    return logical
+
+
+def crear_flujo_moderno(token, entorno, nombre, defn, connrefs,
+                        client_id=None, tenant=None):
+    """Crea el flujo como flujo de SOLUCION con connection references (Shape B):
+    abre en el disenador moderno y cumple PA-SEC-02. Enlaza a conexiones
+    existentes del usuario cuando las encuentra; las que falten, el usuario las
+    autoriza una vez en el portal."""
+    inst, api = _entorno_dataverse(token, entorno)
+    if not inst:
+        raise PaApiError("El entorno no tiene Dataverse: no puedo crear en formato moderno. "
+                         "Usa 'crear --clasico' (abre en el disenador clasico).")
+    tok_dv = _token_dv(inst, client_id, tenant)
+
+    # conexiones existentes del usuario (para pre-enlazar y que se pueda encender sin tocar el portal)
+    conn_por_conector = {}
+    try:
+        tok_pa, _ = _token_para(SCOPE_POWERAPPS, client_id=client_id, tenant=tenant)
+        for c in listar_conexiones(tok_pa, entorno):
+            p = c.get("properties", {}) or {}
+            if _conexion_rota(p):
+                continue
+            clave = str(p.get("apiId", "")).split("/")[-1]
+            conn_por_conector.setdefault(clave, c.get("name"))
+    except PaApiError:
+        pass  # sin conexiones pre-enlazadas: el usuario las autoriza en el portal
+
+    solucion, prefijo = _asegurar_solucion(tok_dv, api)
+    nuevas, sin_enlazar = {}, []
+    for conector in (connrefs or {}):
+        conn_id = conn_por_conector.get(conector)
+        if not conn_id:
+            sin_enlazar.append(conector)
+        logical = _asegurar_connref(tok_dv, api, solucion, prefijo, conector, conn_id)
+        nuevas[conector] = {"runtimeSource": "embedded",
+                            "connection": {"connectionReferenceLogicalName": logical},
+                            "api": {"name": conector}}
+
+    cd = {"properties": {"connectionReferences": nuevas, "definition": defn},
+          "schemaVersion": "1.0.0.0"}
+    wf_id = _dv_post(tok_dv, api, "workflows", {
+        "category": 5, "name": nombre, "type": 1, "primaryentity": "none",
+        "clientdata": json.dumps(cd, ensure_ascii=False)}, solucion=solucion)
+    return {"via": "dataverse (solución, formato moderno)", "workflowid": wf_id,
+            "solucion": solucion, "conexiones_sin_enlazar": sin_enlazar}
+
+
 def cambiar_estado(token, entorno, flow_id, encender, client_id=None, tenant=None):
     """Enciende (True) o apaga (False) un flujo. Devuelve la via usada."""
     inst, api = _entorno_dataverse(token, entorno)
@@ -929,15 +1034,27 @@ def cmd_actualizar(args):
 
 def cmd_crear(args):
     token, entorno, defn, connrefs = _preparar_escritura(args)
+    modo = "clasico (disenador antiguo)" if args.clasico else "moderno (solucion + connection references)"
     if not args.si:
         print(f"\n[SIMULACION] Crearia el flujo '{args.nombre}' en {entorno} "
-              f"(nace APAGADO). Agrega --si para ejecutar.")
+              f"en formato {modo} (nace APAGADO). Agrega --si para ejecutar.")
         return 0
-    r = crear_flujo(token, entorno, args.nombre, defn, connrefs,
-                    client_id=args.client_id, tenant=args.tenant)
+    if args.clasico:
+        r = crear_flujo(token, entorno, args.nombre, defn, connrefs,
+                        client_id=args.client_id, tenant=args.tenant)
+    else:
+        r = crear_flujo_moderno(token, entorno, args.nombre, defn, connrefs,
+                                client_id=args.client_id, tenant=args.tenant)
     print(f"\nFlujo '{args.nombre}' creado via {r['via']}.  ID: {r['workflowid']}")
-    print("Nace APAGADO. Si usa conectores, enlaza las conexiones en el portal y luego:")
-    print(f"  python pa_api.py encender {r['workflowid']} --si")
+    if r.get("solucion"):
+        print(f"Solucion: {r['solucion']}")
+    sin = r.get("conexiones_sin_enlazar")
+    if sin:
+        print(f"Nace APAGADO. Conexiones a autorizar UNA vez en el portal: {', '.join(sin)}")
+        print("  (abre el flujo en make.powerautomate.com, enlaza esas connection references)")
+    else:
+        print("Nace APAGADO (las conexiones ya quedaron enlazadas).")
+    print(f"Enciendelo con:  python pa_api.py encender {r['workflowid']} --si")
     return 0
 
 
@@ -1013,10 +1130,11 @@ def main():
     p.add_argument("--archivo", required=True, help="ruta .json con la definicion nueva")
     p.add_argument("--forzar", action="store_true", help="subir aunque la auditoria previa tenga ALTA")
     p.set_defaults(fn=cmd_actualizar)
-    p = sub.add_parser("crear", help="Crear un flujo nuevo (nace apagado)")
+    p = sub.add_parser("crear", help="Crear un flujo nuevo (formato moderno; nace apagado)")
     escritura(p); p.add_argument("--archivo", required=True, help="ruta .json con la definicion")
     p.add_argument("--nombre", required=True, help="nombre del flujo nuevo")
     p.add_argument("--forzar", action="store_true", help="crear aunque la auditoria previa tenga ALTA")
+    p.add_argument("--clasico", action="store_true", help="crear sin solucion (abre en el disenador clasico)")
     p.set_defaults(fn=cmd_crear)
     p = sub.add_parser("encender", help="Activar un flujo"); escritura(p)
     p.add_argument("flow_id"); p.set_defaults(fn=lambda a: cmd_estado(a, True))

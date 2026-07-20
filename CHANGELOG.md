@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.6.0] — 2026-07-20 · Crear en formato moderno (connection references)
+
+### Corregido — los flujos creados abrían en el diseñador clásico
+- **Causa (verificada con fuentes MS):** crear por la tabla `workflow` produce un
+  flujo de solución, y el diseñador moderno exige **connection references** (no
+  conexiones directas). Ver `references/api-conexion.md`.
+- **`crear` ahora crea en FORMATO MODERNO por defecto** (`crear_flujo_moderno`):
+  asegura una solución dedicada (`PowerAutomateArchitect`) con su publisher, crea
+  las **connection references** (Shape B: `connectionReferenceLogicalName`),
+  las **pre-enlaza** a las conexiones existentes del usuario cuando las encuentra
+  (usa la API de conexiones), y hace POST del flujo con
+  `MSCRM.SolutionUniqueName`. Resultado: abre en el diseñador nuevo y cumple
+  PA-SEC-02. Las conexiones que falten se autorizan una vez en el portal.
+  `crear --clasico` mantiene el comportamiento anterior (sin solución).
+- Prueba offline del ciclo moderno (Shape B, cabecera de solución, pre-enlace) en
+  `evals/verificar_conector.py`.
+
+### Mejorado
+- Skill `pa-copiloto`: exige **nombrar cada acción descriptivamente en español**
+  (PA-NAME-01) y explica el formato moderno + el enlace de conexiones.
+
 ## [1.5.0] — 2026-07-20 · Sesiones por lenguaje natural
 
 ### Agregado — login en 2 pasos (lo maneja el agente, sin terminal)
