@@ -104,6 +104,51 @@ da 404). Viven en PowerApps y requieren su propio token:
 - Flujos suspendidos por DLP: `properties.state == "Suspended"` +
   `flowSuspensionReason` (gratis en la lista de flujos).
 
+## Diseñador moderno: flujos de solución necesitan connection references (verificado 2026-07)
+
+**Problema observado:** un flujo creado por la tabla `workflow` de Dataverse abre
+en el diseñador **clásico** ("New designer can't be used: Uses a connection
+instead of a connection reference (solution flows only)"), mientras que los
+flujos nativos de "Mis flujos" abren en el **moderno**.
+
+**Causa (fuentes MS):** crear por la tabla `workflow` produce un flujo
+**solution-aware** (el code path es "solo Soluciones"; "My Flows aren't supported
+with code"). Un flujo de solución DEBE usar **connection references**, no
+conexiones directas. Nuestro `clientdata` usaba conexiones directas (Shape A) →
+el diseñador moderno lo rechaza. El campo `source` (Embedded/Invoker) NO es la
+causa; lo determinante es la presencia de `connection.connectionReferenceLogicalName`.
+
+**Las dos formas de `connectionReferences`:**
+```jsonc
+// Shape A — conexión directa (flujo NO-solución / "Mis flujos"). Abre moderno solo si el flujo es no-solución.
+"shared_x": { "connectionName": "shared-x-<guid>", "source": "Invoker",
+              "id": "/providers/Microsoft.PowerApps/apis/shared_x", "tier": "NotSpecified" }
+// Shape B — connection REFERENCE (flujo de solución). Requerida por el diseñador moderno.
+"shared_x": { "runtimeSource": "embedded",
+              "connection": { "connectionReferenceLogicalName": "pub_sharedx_ab12c" },
+              "api": { "name": "shared_x" } }
+```
+
+**Vía soportada para crear flujos que abran en el moderno + cierren PA-SEC-02:**
+1. Asegurar una **solución** (con publisher); guardar su unique name.
+2. Crear una fila `connectionreference` por conector (entidad `connectionreference`:
+   `connectionreferencelogicalname`, `connectorid` = `/providers/.../apis/shared_x`,
+   y `connectionid` para enlazarla a una conexión existente del usuario). Crear con
+   cabecera `MSCRM.SolutionUniqueName: <solución>`.
+3. Emitir Shape B en el `clientdata` (referenciando el logical name).
+4. POST del flujo a `workflows` con la misma cabecera `MSCRM.SolutionUniqueName`.
+5. Encender (`statecode:1`) una vez enlazadas las conexiones. El binding de
+   `connectionid` NO lo puede hacer un service principal — sí un token delegado
+   (el nuestro).
+
+Alternativa NO soportada: crear por `api.flow.microsoft.com` (flujo no-solución,
+conexiones directas, abre moderno) — brittle y contra el principio del proyecto.
+
+Fuentes: [manage-flows-with-code](https://learn.microsoft.com/power-automate/manage-flows-with-code) ·
+[create-connection-reference](https://learn.microsoft.com/power-apps/maker/data-platform/create-connection-reference) ·
+[connectionreference entity](https://learn.microsoft.com/power-apps/developer/data-platform/reference/entities/connectionreference) ·
+[solution-api (MSCRM.SolutionUniqueName)](https://learn.microsoft.com/power-platform/alm/solution-api)
+
 ## Otras piezas evaluadas
 
 - **pac CLI (jul-2026): sigue SIN comandos de flujos.** Solo round-trip por solución (`pac solution export/unpack/pack/import`). Útil para versionar en git, no como vía primaria.
