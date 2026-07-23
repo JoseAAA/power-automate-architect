@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.9.0] — 2026-07-20 · Conexiones en blanco por defecto + round-trip .zip validado
+
+### Cambiado — al crear, las conexiones se dejan SIN enlazar (el usuario las conecta)
+- Problema observado: el copiloto iteraba/preguntaba demasiado buscando conexiones
+  y no avanzaba. Ahora `crear` (moderno) crea las **connection references sin
+  enlazar por defecto** — el flujo nace apagado y el usuario las conecta en el
+  portal (un clic por conector). Opt-in `crear --enlazar` para pre-enlazar a
+  conexiones existentes (silencioso). La skill `pa-copiloto` instruye NO
+  interrogar por conexiones (usar referencias por nombre, dejar en blanco, avisar
+  cuáles conectar).
+
+### Validado en vivo — el round-trip por .zip FUNCIONA (base para modificar robusto)
+- Probado contra la cuenta test: `ExportSolution` → editar el `Workflows/*.json`
+  del flujo → repack (subiendo la versión de `solution.xml`) → `ImportSolution`
+  (204) → re-export confirma el cambio en el tenant (hora 7→8). Con token
+  delegado, sin `pac`, sin terceros. Es el mecanismo para el modo modificar
+  confiable (implementación en el siguiente paso).
+
 ## [1.8.0] — 2026-07-20 · Prueba en vivo (jose.alarcon): precisión y hallazgos
 
 ### Corregido — precisión del puntaje (PA-SEC-02 falso positivo)

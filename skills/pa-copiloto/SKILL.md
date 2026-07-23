@@ -123,6 +123,18 @@ autoriza ESAS connection references (una vez cada una), 2) vuelve y dime
 "enciéndelo" (`encender <ID> --si`), 3) valídalo con `corridas <ID>`. Si no faltó
 ninguna, salta directo a encenderlo.
 
+## Conexiones — NO te trabes con esto
+El flujo usa **connection references por nombre de conector** (ej.
+`shared_sharepointonline`); **NO necesitas los GUID de las conexiones reales** para
+crearlo. Por defecto `crear` deja las conexiones **SIN enlazar** y el flujo nace
+apagado: el usuario las conecta en el portal (un clic por conector) al abrirlo.
+- **No interrogues** por conexiones ni iteres buscándolas. Pregunta como MUCHO una
+  vez; si el usuario no las da, sigue igual y déjalas en blanco.
+- Al terminar, dile qué conectores debe enlazar (los que devuelve
+  `conexiones_sin_enlazar`) y que eso se hace una sola vez en make.powerautomate.com.
+- Solo si el usuario lo pide, `crear --enlazar` intenta pre-enlazar a conexiones
+  que ya tenga (silencioso, sin preguntar).
+
 ## Reglas
 - Nunca entregues un flujo que no audite 🟢 (≥90); ideal 100.
 - No inventes operationId/apiId: usa los de las plantillas o de flujos reales.

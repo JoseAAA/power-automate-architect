@@ -325,9 +325,18 @@ def main():
             "statuses": [{"status": "Connected"}]}},
     ]
     CAPTURADO.pop("post_connref", None)
+    # por defecto: conexiones SIN enlazar (el usuario las conecta en el portal)
+    res_def = pa_api.crear_flujo_moderno(
+        tok, "Default-tenant1", "Flujo default",
+        FLUJO_LIMPIO["definition"], FLUJO_LIMPIO.get("connectionReferences", {}))
+    check("moderno: por defecto deja TODAS las conexiones sin enlazar",
+          set(res_def.get("conexiones_sin_enlazar", [])) == {"shared_sharepointonline", "shared_office365"})
+    # con --enlazar: pre-enlaza a las existentes
+    CAPTURADO.pop("post_connref", None)
     res_m = pa_api.crear_flujo_moderno(
         tok, "Default-tenant1", "Flujo moderno demo",
-        FLUJO_LIMPIO["definition"], FLUJO_LIMPIO.get("connectionReferences", {}))
+        FLUJO_LIMPIO["definition"], FLUJO_LIMPIO.get("connectionReferences", {}),
+        enlazar_existentes=True)
     cd_m = json.loads((CAPTURADO.get("post_dv", ("", {}, {}))[1] or {}).get("clientdata", "{}"))
     cr_m = cd_m.get("properties", {}).get("connectionReferences", {})
     hdr_wf = CAPTURADO.get("post_dv", ("", {}, {}))[2] or {}
