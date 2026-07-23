@@ -54,8 +54,11 @@ references, etc.), NO uno armado a mano. Por eso no falla.
 ⚠️ **Permisos:** la vía de solución (formato moderno + modificar por zip) requiere
 que la cuenta tenga rol de **personalizador (System Customizer / Creador del
 entorno)** en el entorno. Si sale error de permisos (403 / "does not have
-ReadAccess"), NO caigas al clásico (está prohibido): dile al usuario que su admin
-de Power Platform debe asignarle ese rol.
+ReadAccess"), NO caigas al clásico (está prohibido). Opciones: (1) pídele a tu
+admin de Power Platform ese rol; (2) si el cambio se puede entregar como flujo
+nuevo/copia corregida, la skill `pa-copiloto` puede generarte el `.zip` importable
+(`crear ... --solo-zip`) para subirlo a mano — así hay entregable aunque el tenant
+no te deje escribir por API.
 
 ## Encender / apagar un flujo
 "enciéndelo" / "actívalo" → `pa_api.py encender <ID> --si`.

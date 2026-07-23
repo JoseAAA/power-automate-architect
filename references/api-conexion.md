@@ -149,6 +149,38 @@ Fuentes: [manage-flows-with-code](https://learn.microsoft.com/power-automate/man
 [connectionreference entity](https://learn.microsoft.com/power-apps/developer/data-platform/reference/entities/connectionreference) ·
 [solution-api (MSCRM.SolutionUniqueName)](https://learn.microsoft.com/power-platform/alm/solution-api)
 
+## Fallback sin permisos: construir el .zip de solución DESDE CERO (verificado 2026-07)
+
+Si la cuenta no puede escribir en el tenant (403 / sin rol de Creador del entorno),
+`crear` genera **localmente** un `.zip` de solución NO administrada importable a mano
+(portal → Soluciones → Importar solución). Objetivo: siempre hay entregable. Se
+arma sin red (`construir_solucion_zip`), con estructura verificada de Microsoft:
+
+```
+[Content_Types].xml     # OPC estándar (Default json/xml → application/octet-stream)
+solution.xml            # ImportExportXml/SolutionManifest/Publisher/RootComponents
+customizations.xml      # <Workflows><Workflow ...><JsonFileName>/Workflows/…json</…>
+Workflows/<Nombre>-<GUID32>.json   # el "clientdata": properties.definition + connectionReferences + schemaVersion
+```
+
+Piezas confirmadas (no inventadas):
+- **RootComponent de un flujo** = `<RootComponent type="29" id="{guid}" behavior="0" />`
+  (verbatim de un export real; ComponentType 29 = Workflow en MS Learn `solutioncomponent`).
+- **`Workflows/*.json`** = el `clientdata` shape verbatim de *manage-flows-with-code*
+  (`connectionReferences` con `"connection": {}`/logical name sin enlazar, `definition`
+  con `$connections`/`$authentication`, `schemaVersion "1.0.0.0"`).
+- `<Category>5</Category>`, `<Type>1</Type>`, `PrimaryEntity none`, `StateCode 0`
+  (nace apagado). Connection references sin enlazar → se conectan al abrir en el portal.
+
+✅ **Validado en vivo (2026-07-23):** un `.zip` generado desde cero (flujo mínimo)
+se importó con `ImportSolution` en un entorno real; Microsoft lo **aceptó** y el
+flujo quedó como flujo de solución (`category 5`, apagado), visible en "Mis flujos".
+Prueba con identidad aislada y limpieza total (flujo+solución+publisher) — cero
+residuo. La validez estructural además se prueba offline (`verificar_conector.py` #16).
+Fuentes extra: [export-flow-solution](https://learn.microsoft.com/power-automate/export-flow-solution) ·
+[Solution.xml real](https://github.com/WaelHamze/dyn365-ce-devops-sample) (RootComponent type 29) ·
+temmyraharjo (shape `<Workflow>`/`<connectionreference>`).
+
 ## Otras piezas evaluadas
 
 - **pac CLI (jul-2026): sigue SIN comandos de flujos.** Solo round-trip por solución (`pac solution export/unpack/pack/import`). Útil para versionar en git, no como vía primaria.

@@ -14,6 +14,8 @@ y verifica lectura Y escritura:
   8. crear_flujo: POST a Dataverse y extraccion del id (OData-EntityId)
   9. cambiar_estado: statecode via Dataverse / start-stop via maker (sin Dataverse)
  10. _preauditar: acepta una definicion limpia y bloquea (exit 1) una con ALTA
+ 11-15. multi-cuenta, auditoria de tenant, salud, creacion moderna, modificar por .zip
+ 16. construir_solucion_zip (fallback sin permisos): .zip importable valido + --solo-zip
 
   python evals/verificar_conector.py     -> exit 0 si todo pasa, 1 si algo falla
 """
@@ -403,6 +405,63 @@ def main():
           "1.0.0.6" in zimp.read("solution.xml").decode("utf-8"))
     check("zip: el import lleva OverwriteUnmanagedCustomizations",
           (CAPTURADO.get("import_sol", ("", {}, {}))[1] or {}).get("OverwriteUnmanagedCustomizations") is True)
+
+    # 16. CONSTRUIR .zip importable desde cero + fallback de permisos en cmd_crear
+    import xml.dom.minidom as _MD
+    defn_z = json.loads(json.dumps(FLUJO_LIMPIO["definition"]))
+    zb, info = pa_api.construir_solucion_zip(
+        "Recordatorio Cumpleaños", defn_z,
+        {"shared_office365": {}, "shared_sharepointonline": {}})
+    zz = zipfile.ZipFile(io.BytesIO(zb))
+    nombres = set(zz.namelist())
+    check("build-zip: contiene los 4 archivos de solución",
+          {"[Content_Types].xml", "solution.xml", "customizations.xml"} <= nombres
+          and any(n.startswith("Workflows/") for n in nombres))
+    ok_xml = True
+    for n in ("[Content_Types].xml", "solution.xml", "customizations.xml"):
+        try:
+            _MD.parseString(zz.read(n))
+        except Exception:
+            ok_xml = False
+    check("build-zip: XML bien formado en los 3 manifiestos", ok_xml)
+    g = info["workflowid"]
+    sol_x = zz.read("solution.xml").decode("utf-8")
+    cus_x = zz.read("customizations.xml").decode("utf-8")
+    wf_entry = info["archivo_interno"]
+    check("build-zip: RootComponent type 29 con el guid del flujo",
+          'type="29"' in sol_x and "{" + g + "}" in sol_x.lower())
+    check("build-zip: JsonFileName apunta al archivo real del flujo",
+          "/" + wf_entry in cus_x and g.replace("-", "").upper() in wf_entry)
+    cd_z = json.loads(zz.read(wf_entry).decode("utf-8"))
+    check("build-zip: el flujo hace round-trip (definición + $authentication)",
+          bool(cd_z["properties"]["definition"]["triggers"]) and
+          "$authentication" in cd_z["properties"]["definition"]["parameters"] and
+          cd_z["schemaVersion"] == "1.0.0.0")
+    check("build-zip: conexiones SIN enlazar por defecto (logical name, sin connectionid)",
+          all("connectionReferenceLogicalName" in (v.get("connection") or {})
+              for v in cd_z["properties"]["connectionReferences"].values())
+          and info["conexiones_sin_enlazar"] == ["shared_office365", "shared_sharepointonline"])
+
+    # fallback: si crear_flujo_moderno falla por permisos, cmd_crear deja el .zip y NO revienta
+    carpeta_zip = tmp_dir / "flujos-locales"
+    ARCHIVO_LIMPIO = str(RAIZ / "evals" / "flujos" / "flujo-limpio.json")
+
+    def _crear_403(*a, **k):
+        raise pa_api.PaApiError("Sin permiso para .../workflows (403).")
+
+    pa_api.crear_flujo_moderno = _crear_403
+    rc_fb = pa_api.cmd_crear(_Args(
+        archivo=ARCHIVO_LIMPIO, nombre="Flujo sin permisos", entorno="Default-tenant1",
+        si=True, forzar=False, enlazar=False, solo_zip=False, carpeta=str(carpeta_zip)))
+    check("fallback: sin permisos, cmd_crear devuelve 0 y deja un .zip",
+          rc_fb == 0 and len(list(carpeta_zip.glob("*.zip"))) == 1)
+
+    # --solo-zip: genera el .zip SIN --si y sin tocar el tenant
+    rc_sz = pa_api.cmd_crear(_Args(
+        archivo=ARCHIVO_LIMPIO, nombre="Flujo solo zip", entorno="Default-tenant1",
+        si=False, forzar=False, enlazar=False, solo_zip=True, carpeta=str(carpeta_zip)))
+    check("--solo-zip: genera el .zip sin --si y sin tocar el tenant",
+          rc_sz == 0 and len(list(carpeta_zip.glob("*.zip"))) == 2)
 
     print("-" * 50)
     print("TODO OK" if not fallas else f"{len(fallas)} verificacion(es) fallida(s)")

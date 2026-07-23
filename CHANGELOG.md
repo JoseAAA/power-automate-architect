@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.11.0] — 2026-07-23 · Fallback sin permisos: siempre queda el .zip importable
+
+### Agregado — si no puedes escribir en el tenant, igual hay entregable
+- **`crear` nunca se rinde por permisos**: si crear en el tenant falla (403 / sin
+  rol de Creador del entorno), genera **localmente** el `.zip` de solución
+  importable en `./flujos-locales/` y muestra el paso a paso para subirlo a mano
+  (portal → **Soluciones → Importar solución**). Así siempre hay un resultado
+  usable, aunque tu cuenta no pueda escribir por API o se lo pases a un compañero
+  con permisos.
+- **`crear ... --solo-zip`**: genera SOLO el `.zip` sin tocar el tenant (no requiere
+  `--si`; es local y no destructivo). Rápido para cuando ya sabes que no tienes
+  permisos o solo quieres el archivo.
+- **`construir_solucion_zip`** (100% local, sin red): arma un `.zip` de solución NO
+  administrada con estructura **verificada de Microsoft** — `solution.xml`
+  (`RootComponent type="29"` = Workflow, verbatim de un export real),
+  `customizations.xml` (`<Workflow>` + `<connectionreference>`), `[Content_Types].xml`
+  y `Workflows/<Nombre>-<GUID>.json` (el `clientdata` shape de *manage-flows-with-code*).
+  Conexiones **sin enlazar** (se conectan al abrir en el portal); flujo nace apagado.
+- Prueba offline #16 (16/16): 4 archivos presentes, XML bien formado, IDs
+  consistentes (solution.xml ↔ customizations.xml ↔ nombre de archivo), flujo
+  round-trip con `$authentication`, y el fallback de `cmd_crear` devuelve 0 dejando
+  el `.zip`.
+
+### Validado en vivo (2026-07-23)
+- Un `.zip` generado desde cero se **importó con éxito** en un entorno real
+  (`ImportSolution`): Microsoft lo aceptó y el flujo quedó como flujo de solución
+  (apagado), visible en "Mis flujos". Prueba aislada con limpieza total (cero
+  residuo). El formato del `.zip` queda así confirmado, no solo estructuralmente.
+
 ## [1.10.0] — 2026-07-20 · Modificar por .zip de solución + clásico prohibido
 
 ### Agregado — modificar por round-trip de solución (confiable, "como el experto")

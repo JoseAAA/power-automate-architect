@@ -113,8 +113,22 @@ python "scripts/pa_api.py" crear --archivo trabajo.json --nombre "..." --si
 Se crea en **formato moderno** (flujo de solución + connection references): abre
 en el diseñador nuevo y cumple PA-SEC-02. El plugin enlaza solo las conexiones
 que el usuario ya tenga; las que falten se autorizan una vez (ver Paso 5). Sin
-sesión: primero `login`; sin `--si` muestra la simulación — enséñala.
-(Solo si el usuario lo pide: `--clasico` crea sin solución, diseñador antiguo.)
+sesión: primero `login`; sin `--si` muestra la simulación — enséñala. El diseñador
+clásico está prohibido (descontinuado y falla por defecto): nunca lo uses.
+
+### Si tu cuenta NO tiene permisos para crear (resultado igual, siempre)
+Si al crear sale error de permisos (403 / falta rol de Creador del entorno),
+`crear` **NO se rinde**: genera el `.zip` de solución importable en
+`./flujos-locales/` y te imprime el paso a paso para subirlo a mano
+(make.powerautomate.com → **Soluciones → Importar solución** → elegir el `.zip`).
+Así siempre hay un entregable, aunque el tenant no te deje escribir por API.
+- Para generar SOLO el `.zip` sin intentar tocar el tenant (más rápido, o para
+  pasárselo a un compañero con permisos): agrega `--solo-zip` (no requiere `--si`).
+- El `.zip` importa el flujo APAGADO y con las conexiones **sin enlazar** (se
+  conectan una vez al abrirlo en el portal) — igual que el camino normal.
+✅ El formato del `.zip` está validado en vivo (import real aceptado por Microsoft,
+flujo creado como solución). Lo que SÍ debes recordarle al usuario: tras importar,
+el flujo nace apagado y hay que enlazar sus conexiones una vez y encenderlo.
 
 ## Paso 5 — Ponerlo a andar (manos del usuario)
 El flujo nace APAGADO. El comando te dice qué conexiones quedaron **sin enlazar**
