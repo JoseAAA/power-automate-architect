@@ -36,18 +36,26 @@ con checkboxes: `[ ] descargado (ruta)` `[ ] editado (qué)` `[ ] auditado (scor
 `[ ] confirmado por usuario` `[ ] subido (via, respaldo)` `[ ] validado (corrida)`.
 Actualízalo al completar CADA paso; si la conversación se compacta, retoma de ahí.
 
-## Ciclo MODIFICAR ("agrégale manejo de errores a X")
-```bash
-python "scripts/pa_api.py" flujo <ID> --guardar flujo.json
-```
-1. Edita `flujo.json` con el cambio pedido. NO inventes operationId/apiId:
-   reutiliza los de la definición.
-2. Audita local hasta quedar sin ALTA (con `--json` para leer códigos/score
-   sin raspar texto): `python "scripts/auditar_flujo.py" flujo.json --json`
-3. Muestra al usuario el resumen (acciones que cambian, score antes → después)
-   y pide confirmación. Con el OK:
+## Ciclo MODIFICAR — por .zip de solución (confiable, como un experto)
+Se edita el **JSON REAL exportado** (que ya trae `$authentication`, connection
+references, etc.), NO uno armado a mano. Por eso no falla.
+1. Exporta el JSON real (paso 1):
+   `python "scripts/pa_api.py" exportar-flujo <ID> --a flujo.json`
+   (NO uses `flujo --guardar` para modificar: ese es el formato de la maker API y
+   al reimportar falla; `exportar-flujo` da el JSON de solución correcto.)
+2. Edita `flujo.json` dentro de `properties.definition` con el cambio pedido. NO
+   inventes operationId/apiId: reutiliza los de la definición.
+3. Audita hasta quedar sin ALTA: `auditar_flujo.py flujo.json --json`.
+4. Muestra el resumen (qué cambia, score antes → después), pide confirmación, y con el OK:
    `python "scripts/pa_api.py" actualizar <ID> --archivo flujo.json --si`
-4. Valida con `corridas <ID>` y reporta en simple (+ ruta del respaldo).
+   (hace export→editar→import de la solución, con respaldo del zip anterior.)
+5. Valida con `corridas <ID>` y reporta en simple (+ ruta del respaldo).
+
+⚠️ **Permisos:** la vía de solución (formato moderno + modificar por zip) requiere
+que la cuenta tenga rol de **personalizador (System Customizer / Creador del
+entorno)** en el entorno. Si sale error de permisos (403 / "does not have
+ReadAccess"), NO caigas al clásico (está prohibido): dile al usuario que su admin
+de Power Platform debe asignarle ese rol.
 
 ## Encender / apagar un flujo
 "enciéndelo" / "actívalo" → `pa_api.py encender <ID> --si`.

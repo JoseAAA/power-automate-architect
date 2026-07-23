@@ -15,6 +15,8 @@ Uso:
   python pa_api.py corridas <flowId>       Historial de ejecuciones
   python pa_api.py auditar <flowId>        Descarga el flujo y corre el auditor local
   python pa_api.py auditar-todos [--detalle f.json]  Audita TODO el tenant (resumen)
+  python pa_api.py exportar-flujo <flowId> --a f.json  Exporta el JSON real para editar
+  python pa_api.py actualizar <flowId> --archivo f.json --si  Modifica por .zip (paso 2)
   python pa_api.py salud [--detalle f.json]  Conexiones rotas, flujos afectados, suspendidos
   python pa_api.py actualizar <flowId> --archivo f.json --si   Modifica un flujo (con respaldo)
   python pa_api.py crear --archivo f.json --nombre "X" --si    Crea un flujo (nace apagado)
@@ -45,8 +47,13 @@ tocar los comandos. Detalle y fuentes: references/api-conexion.md.
 Requiere: pip install msal msal-extensions requests
 """
 import argparse
+import base64
+import io
 import json
+import re
 import subprocess
+import uuid
+import zipfile
 import sys
 import tempfile
 import time
@@ -525,6 +532,134 @@ def cambiar_estado(token, entorno, flow_id, encender, client_id=None, tenant=Non
     _http("POST", f"{API_FLOW}/providers/Microsoft.ProcessSimple/environments/{entorno}"
           f"/flows/{flow_id}/{accion}?api-version={APIVER}", token)
     return "maker API"
+
+
+# ---------------------------------------------------------------------------
+# MODIFICAR por round-trip de SOLUCION (.zip) — el modo confiable y rapido:
+# exportar la solucion -> editar el JSON REAL del flujo (ya trae $authentication,
+# connection references, etc.) -> reimportar. Igual que hace un experto a mano,
+# pero automatico. Verificado en vivo + fuentes en references/api-conexion.md.
+# ComponentType 29 = Workflow (verificado: Microsoft Learn solutioncomponent).
+# ---------------------------------------------------------------------------
+COMPONENT_TYPE_WORKFLOW = 29
+
+
+def exportar_solucion(tok_dv, api, nombre_solucion):
+    try:
+        r = _http("POST", f"{api}/api/data/v9.2/ExportSolution", tok_dv,
+                  {"SolutionName": nombre_solucion, "Managed": False}, timeout=300)
+    except PaApiError as e:
+        s = str(e)
+        if "403" in s or "does not have" in s or "ReadAccess" in s or "privilege" in s.lower():
+            raise PaApiError(
+                "No pude exportar/gestionar la solucion por PERMISOS de Dataverse. La via de "
+                "solucion (formato moderno + modificar por zip) necesita que TU cuenta tenga el "
+                "rol de personalizador (System Customizer / Creador del entorno) y acceso a los "
+                "componentes de la solucion. Habla con tu admin de Power Platform para que te "
+                "asigne ese rol en este entorno. Sin eso, ni el portal ni esta herramienta pueden "
+                "crear/editar flujos en solucion.")
+        raise
+    return base64.b64decode(r["ExportSolutionFile"])
+
+
+def importar_solucion(tok_dv, api, zip_bytes):
+    _http("POST", f"{api}/api/data/v9.2/ImportSolution", tok_dv,
+          {"OverwriteUnmanagedCustomizations": True, "PublishWorkflows": True,
+           "CustomizationFile": base64.b64encode(zip_bytes).decode(),
+           "ImportJobId": str(uuid.uuid4())}, timeout=600)
+
+
+def _resolver_workflowid(tok_dv, api, flow_id):
+    """El id del flujo (maker) mapea al workflowid o workflowidunique en Dataverse."""
+    for campo in ("workflowid", "workflowidunique"):
+        r = _dv_get(tok_dv, api, f"workflows?$filter={campo} eq {flow_id} and category eq 5"
+                                 "&$select=workflowid,name")
+        if r.get("value"):
+            return r["value"][0]["workflowid"], r["value"][0].get("name", "")
+    return None, None
+
+
+def _asegurar_flujo_en_solucion(tok_dv, api, workflow_id, solucion):
+    """Agrega el flujo a nuestra solucion (si no estaba). No destructivo."""
+    try:
+        _http("POST", f"{api}/api/data/v9.2/AddSolutionComponent", tok_dv,
+              {"ComponentId": workflow_id, "ComponentType": COMPONENT_TYPE_WORKFLOW,
+               "SolutionUniqueName": solucion, "AddRequiredComponents": False})
+    except PaApiError:
+        pass  # ya estaba, o no se puede agregar; el export igual lo trae si estaba
+
+
+def _subir_version_solucion(xml_bytes):
+    m = re.search(rb"<Version>(\d+)\.(\d+)\.(\d+)\.(\d+)</Version>", xml_bytes)
+    if not m:
+        return xml_bytes
+    a, b, c, d = (int(x) for x in m.groups())
+    return xml_bytes[:m.start()] + f"<Version>{a}.{b}.{c}.{d + 1}</Version>".encode() + xml_bytes[m.end():]
+
+
+def _hallar_workflow_en_zip(zin, wf_id):
+    corto = wf_id.replace("-", "").lower()
+    for n in zin.namelist():
+        if (n.lower().startswith("workflows/") and n.lower().endswith(".json")
+                and corto in n.replace("-", "").lower()):
+            return n
+    return None
+
+
+def _preparar_flujo_en_solucion(tok_dv, api, flow_id):
+    wf_id, _nombre = _resolver_workflowid(tok_dv, api, flow_id)
+    if not wf_id:
+        raise PaApiError("No encontre el flujo en Dataverse (¿es de otro dueno o de otro entorno?).")
+    solucion, _p = _asegurar_solucion(tok_dv, api)
+    _asegurar_flujo_en_solucion(tok_dv, api, wf_id, solucion)
+    return wf_id, solucion
+
+
+def exportar_flujo_json(token, entorno, flow_id, client_id=None, tenant=None):
+    """Devuelve el JSON REAL del flujo (formato de solucion) para que el agente lo
+    edite. Asegura primero que el flujo este en nuestra solucion."""
+    inst, api = _entorno_dataverse(token, entorno)
+    if not inst:
+        raise PaApiError("El entorno no tiene Dataverse.")
+    tok_dv = _token_dv(inst, client_id, tenant)
+    wf_id, solucion = _preparar_flujo_en_solucion(tok_dv, api, flow_id)
+    zin = zipfile.ZipFile(io.BytesIO(exportar_solucion(tok_dv, api, solucion)))
+    target = _hallar_workflow_en_zip(zin, wf_id)
+    if not target:
+        raise PaApiError("El flujo no aparecio en el zip de la solucion.")
+    return json.loads(zin.read(target).decode("utf-8"))
+
+
+def modificar_flujo_zip(token, entorno, flow_id, workflows_json, client_id=None, tenant=None):
+    """Reemplaza el JSON del flujo dentro del .zip de la solucion y reimporta.
+    workflows_json = el JSON REAL editado (el que dio exportar_flujo_json)."""
+    inst, api = _entorno_dataverse(token, entorno)
+    if not inst:
+        raise PaApiError("El entorno no tiene Dataverse.")
+    tok_dv = _token_dv(inst, client_id, tenant)
+    wf_id, solucion = _preparar_flujo_en_solucion(tok_dv, api, flow_id)
+    raw = exportar_solucion(tok_dv, api, solucion)
+    zin = zipfile.ZipFile(io.BytesIO(raw))
+    target = _hallar_workflow_en_zip(zin, wf_id)
+    if not target:
+        raise PaApiError("El flujo no aparecio en el zip de la solucion.")
+    # respaldo: el zip exportado (estado anterior completo)
+    marca = time.strftime("%Y%m%d-%H%M%S")
+    ruta = DIR_CONFIG / "respaldos" / f"{flow_id}-{marca}.zip"
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_bytes(raw)
+    # reempaquetar con el JSON editado y la version subida
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zout:
+        for n in zin.namelist():
+            data = zin.read(n)
+            if n == target:
+                data = json.dumps(workflows_json, ensure_ascii=False).encode("utf-8")
+            elif n.lower() == "solution.xml":
+                data = _subir_version_solucion(data)
+            zout.writestr(n, data)
+    importar_solucion(tok_dv, api, buf.getvalue())
+    return {"via": "solución .zip (export→editar→import)", "respaldo": str(ruta), "solucion": solucion}
 
 
 # ---------------------------------------------------------------------------
@@ -1038,17 +1173,43 @@ def _preparar_escritura(args, necesita_archivo=True):
     return token, entorno, defn, connrefs, descripcion
 
 
+def cmd_exportar_flujo(args):
+    token, _ = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
+    entorno = args.entorno or entorno_por_defecto(token)
+    wf = exportar_flujo_json(token, entorno, args.flow_id,
+                             client_id=args.client_id, tenant=args.tenant)
+    Path(args.a).write_text(json.dumps(wf, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"JSON REAL del flujo exportado a: {args.a}")
+    print("Edita ese archivo (la definicion, dentro de properties.definition) y luego:")
+    print(f"  python pa_api.py actualizar {args.flow_id} --archivo {args.a} --si")
+    return 0
+
+
 def cmd_actualizar(args):
-    token, entorno, defn, connrefs, _desc = _preparar_escritura(args)
+    token, _ = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
+    entorno = args.entorno or entorno_por_defecto(token)
+    obj = json.loads(Path(args.archivo).read_text(encoding="utf-8"))
+    props = obj.get("properties", obj) if isinstance(obj, dict) else {}
+    defn = props.get("definition")
+    if not defn:
+        raise PaApiError(f"{args.archivo} no tiene properties.definition. Usa "
+                         "'exportar-flujo' para obtener el JSON correcto, edítalo y vuelve.")
+    # auditoria previa de la definicion editada
+    codigo, salida = _preauditar(defn, props.get("connectionReferences") or {})
+    linea = next((l for l in salida.splitlines() if "PUNTUACION" in l), "")
+    print(f"Auditoria previa de la definicion editada: {linea.strip() or '?'}")
+    if codigo == 1 and not getattr(args, "forzar", False):
+        print(salida)
+        raise PaApiError("La definicion editada tiene hallazgos ALTA; corrigelos o usa --forzar.")
     if not args.si:
-        print(f"\n[SIMULACION] Actualizaria el flujo {args.flow_id} en {entorno} "
-              f"(con respaldo previo automatico). Agrega --si para ejecutar.")
+        print(f"\n[SIMULACION] Modificaria el flujo {args.flow_id} via .zip de solucion "
+              "(export→editar→import, con respaldo del zip anterior). Agrega --si para ejecutar.")
         return 0
-    r = actualizar_flujo(token, entorno, args.flow_id, defn, connrefs,
-                         client_id=args.client_id, tenant=args.tenant)
-    print(f"\nFlujo actualizado via {r['via']}.")
-    print(f"Respaldo del estado anterior: {r['respaldo']}")
-    print("Sugerencia: valida con  python pa_api.py corridas " + args.flow_id)
+    r = modificar_flujo_zip(token, entorno, args.flow_id, obj,
+                            client_id=args.client_id, tenant=args.tenant)
+    print(f"\nFlujo modificado via {r['via']}.")
+    print(f"Respaldo (zip del estado anterior): {r['respaldo']}")
+    print("Valida con:  python pa_api.py corridas " + args.flow_id)
     return 0
 
 
@@ -1145,9 +1306,13 @@ def main():
     def escritura(p):
         comunes(p)
         p.add_argument("--si", action="store_true", help="ejecutar de verdad (sin esto: simulacion)")
-    p = sub.add_parser("actualizar", help="Reemplazar la definicion de un flujo (con respaldo)")
+    p = sub.add_parser("exportar-flujo", help="Exporta el JSON REAL de un flujo para editarlo (paso 1 de modificar)")
+    comunes(p); p.add_argument("flow_id")
+    p.add_argument("--a", required=True, help="ruta .json donde guardar el JSON del flujo")
+    p.set_defaults(fn=cmd_exportar_flujo)
+    p = sub.add_parser("actualizar", help="Modificar un flujo por .zip de solucion (paso 2; con respaldo)")
     escritura(p); p.add_argument("flow_id")
-    p.add_argument("--archivo", required=True, help="ruta .json con la definicion nueva")
+    p.add_argument("--archivo", required=True, help="el JSON del flujo (de exportar-flujo) ya editado")
     p.add_argument("--forzar", action="store_true", help="subir aunque la auditoria previa tenga ALTA")
     p.set_defaults(fn=cmd_actualizar)
     p = sub.add_parser("crear", help="Crear un flujo nuevo (formato moderno; nace apagado)")
