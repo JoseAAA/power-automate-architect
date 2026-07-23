@@ -189,13 +189,14 @@ def _token_para(scopes, interactivo=False, device=False, client_id=None, tenant=
 # ---------------------------------------------------------------------------
 # HTTP (unico punto de salida a la red; endpoints intercambiables)
 # ---------------------------------------------------------------------------
-def _http(metodo, url, token, cuerpo=None, intentos=3, cabeceras=None, con_cabeceras=False):
+def _http(metodo, url, token, cuerpo=None, intentos=3, cabeceras=None, con_cabeceras=False,
+          timeout=60):
     for i in range(intentos):
         r = requests.request(
             metodo, url,
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
                      **(cabeceras or {})},
-            json=cuerpo, timeout=60)
+            json=cuerpo, timeout=timeout)
         if r.status_code == 429 or r.status_code >= 500:
             espera = int(r.headers.get("Retry-After", 2 ** (i + 1)))
             if i < intentos - 1:
@@ -469,8 +470,8 @@ def crear_flujo_moderno(token, entorno, nombre, defn, connrefs,
     enlazar_existentes=True intenta pre-enlazar a conexiones que el usuario ya tenga."""
     inst, api = _entorno_dataverse(token, entorno)
     if not inst:
-        raise PaApiError("El entorno no tiene Dataverse: no puedo crear en formato moderno. "
-                         "Usa 'crear --clasico' (abre en el disenador clasico).")
+        raise PaApiError("El entorno no tiene Dataverse: no puedo crear en formato moderno "
+                         "(el clasico esta descontinuado y no se usa).")
     tok_dv = _token_dv(inst, client_id, tenant)
 
     conn_por_conector = {}
@@ -1053,19 +1054,17 @@ def cmd_actualizar(args):
 
 def cmd_crear(args):
     token, entorno, defn, connrefs, descripcion = _preparar_escritura(args)
-    modo = "clasico (disenador antiguo)" if args.clasico else "moderno (solucion + connection references)"
     if not args.si:
         print(f"\n[SIMULACION] Crearia el flujo '{args.nombre}' en {entorno} "
-              f"en formato {modo} (nace APAGADO). Agrega --si para ejecutar.")
+              f"en formato moderno (solucion + connection references; nace APAGADO). "
+              "Agrega --si para ejecutar.")
         return 0
-    if args.clasico:
-        r = crear_flujo(token, entorno, args.nombre, defn, connrefs,
-                        client_id=args.client_id, tenant=args.tenant)
-    else:
-        r = crear_flujo_moderno(token, entorno, args.nombre, defn, connrefs,
-                                client_id=args.client_id, tenant=args.tenant,
-                                descripcion=descripcion,
-                                enlazar_existentes=getattr(args, "enlazar", False))
+    # SIEMPRE formato moderno. El disenador clasico esta prohibido (falla por
+    # defecto y esta descontinuado en Power Automate).
+    r = crear_flujo_moderno(token, entorno, args.nombre, defn, connrefs,
+                            client_id=args.client_id, tenant=args.tenant,
+                            descripcion=descripcion,
+                            enlazar_existentes=getattr(args, "enlazar", False))
     print(f"\nFlujo '{args.nombre}' creado via {r['via']}.  ID: {r['workflowid']}")
     if r.get("solucion"):
         print(f"Solucion: {r['solucion']}")
@@ -1155,7 +1154,6 @@ def main():
     escritura(p); p.add_argument("--archivo", required=True, help="ruta .json con la definicion")
     p.add_argument("--nombre", required=True, help="nombre del flujo nuevo")
     p.add_argument("--forzar", action="store_true", help="crear aunque la auditoria previa tenga ALTA")
-    p.add_argument("--clasico", action="store_true", help="crear sin solucion (abre en el disenador clasico)")
     p.add_argument("--enlazar", action="store_true", help="pre-enlazar a conexiones existentes (def: las dejas en blanco para el portal)")
     p.set_defaults(fn=cmd_crear)
     p = sub.add_parser("encender", help="Activar un flujo"); escritura(p)
