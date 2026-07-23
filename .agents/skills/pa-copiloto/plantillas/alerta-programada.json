@@ -1,7 +1,7 @@
 {
   "properties": {
-    "displayName": "Legal - Alerta de contratos por vencer (Programado)",
-    "description": "Cada dia a las 7am revisa los contratos que vencen en 30 dias y avisa al responsable. Try/Catch con Terminate; filtros y tope en el origen; conexiones por referencia.",
+    "displayName": "Inventario - Aviso de stock bajo (Programado)",
+    "description": "Cada dia a las 7am revisa los productos con stock bajo y avisa al responsable. Try/Catch con Terminate; filtros y tope en el origen; conexiones por referencia.",
     "definition": {
       "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
       "contentVersion": "1.0.0.0",
@@ -15,17 +15,17 @@
         "Try": {
           "type": "Scope",
           "runAfter": {},
-          "description": "Logica principal: leer contratos filtrados en origen y avisar al responsable",
+          "description": "Logica principal: leer productos con stock bajo y avisar al responsable",
           "actions": {
-            "Listar_contratos_por_vencer": {
+            "Listar_productos_con_stock_bajo": {
               "type": "OpenApiConnection",
               "runAfter": {},
               "inputs": {
                 "host": { "connectionName": "shared_sharepointonline", "operationId": "GetItems", "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
                 "parameters": {
-                  "dataset": "@parameters('SitioLegal (demo_SitioLegal)')",
-                  "table": "@parameters('ListaContratos (demo_ListaContratos)')",
-                  "$filter": "Vence le '@{addDays(utcNow(), 30)}'",
+                  "dataset": "@parameters('SitioInventario (demo_SitioInventario)')",
+                  "table": "@parameters('ListaProductos (demo_ListaProductos)')",
+                  "$filter": "Stock lt 10",
                   "$top": 100
                 },
                 "retryPolicy": { "type": "exponential", "count": 4, "interval": "PT7S" }
@@ -33,10 +33,10 @@
             },
             "Seleccionar_datos_del_aviso": {
               "type": "Select",
-              "runAfter": { "Listar_contratos_por_vencer": ["Succeeded"] },
+              "runAfter": { "Listar_productos_con_stock_bajo": ["Succeeded"] },
               "inputs": {
-                "from": "@outputs('Listar_contratos_por_vencer')?['body/value']",
-                "select": { "titulo": "@item()?['Title']", "vence": "@item()?['Vence']" }
+                "from": "@outputs('Listar_productos_con_stock_bajo')?['body/value']",
+                "select": { "producto": "@item()?['Title']", "stock": "@item()?['Stock']" }
               }
             },
             "Avisar_al_responsable": {
@@ -46,7 +46,7 @@
                 "host": { "connectionName": "shared_office365", "operationId": "SendEmailV2", "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365" },
                 "parameters": {
                   "emailMessage/To": "@parameters('CorreoResponsable (demo_CorreoResponsable)')",
-                  "emailMessage/Subject": "Contratos por vencer en 30 dias",
+                  "emailMessage/Subject": "Productos con stock bajo",
                   "emailMessage/Body": "@{body('Seleccionar_datos_del_aviso')}"
                 },
                 "retryPolicy": { "type": "exponential", "count": 4, "interval": "PT7S" }
@@ -67,15 +67,15 @@
             "Terminar_como_fallido": {
               "type": "Terminate",
               "runAfter": { "Redactar_detalle_del_error": ["Succeeded"] },
-              "inputs": { "runStatus": "Failed", "runError": { "code": "TryFallo", "message": "Fallo la revision diaria de contratos" } }
+              "inputs": { "runStatus": "Failed", "runError": { "code": "TryFallo", "message": "Fallo la revision diaria de stock" } }
             }
           }
         }
       }
     },
     "connectionReferences": {
-      "shared_sharepointonline": { "connectionName": "sp-legal", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
-      "shared_office365": { "connectionName": "o365-legal", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_office365" }
+      "shared_sharepointonline": { "connectionName": "sp-inventario", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
+      "shared_office365": { "connectionName": "o365-inventario", "source": "Invoker", "id": "/providers/Microsoft.PowerApps/apis/shared_office365" }
     }
   }
 }

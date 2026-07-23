@@ -210,7 +210,7 @@ def main():
     cod_ok, _ = pa_api._preauditar(FLUJO_LIMPIO["definition"],
                                    {"c": {"connectionName": "x", "source": "Invoker"}})
     defn_mala = json.loads(json.dumps(FLUJO_LIMPIO["definition"]))
-    defn_mala["actions"]["Try"]["actions"]["Listar_contratos_por_vencer"]["inputs"][
+    defn_mala["actions"]["Try"]["actions"]["Listar_productos_con_stock_bajo"]["inputs"][
         "parameters"]["password"] = "super-secreto-123"
     cod_mal, _ = pa_api._preauditar(defn_mala, {})
     check("preauditoria: limpio pasa (0) y con secreto bloquea (1)",

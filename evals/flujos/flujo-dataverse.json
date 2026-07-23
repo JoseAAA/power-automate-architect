@@ -10,7 +10,7 @@
           "runtimeConfiguration": { "concurrency": { "runs": 1 } },
           "inputs": {
             "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "SubscribeWebhookTrigger", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
-            "parameters": { "subscriptionRequest/message": 3, "subscriptionRequest/entityname": "contratos", "subscriptionRequest/scope": 4 }
+            "parameters": { "subscriptionRequest/message": 3, "subscriptionRequest/entityname": "productos", "subscriptionRequest/scope": 4 }
           }
         }
       },
@@ -20,7 +20,7 @@
           "runAfter": {},
           "inputs": {
             "host": { "connectionName": "shared_commondataserviceforapps", "operationId": "UpdateRecord", "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps" },
-            "parameters": { "entityname": "contratos", "recordId": "@triggerOutputs()?['body/contratoid']", "item/estado": 1 }
+            "parameters": { "entityname": "productos", "recordId": "@triggerOutputs()?['body/productoid']", "item/estado": 1 }
           }
         }
       }

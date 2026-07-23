@@ -96,7 +96,7 @@ Rutas: `${CLAUDE_PLUGIN_ROOT}/skills/pa-copiloto/plantillas/`.
    variables de entorno y explícale que se configuran al importar.
 2. **Nombra CADA acción de forma descriptiva en español** (PA-NAME-01): nunca
    dejes "Compose", "Condition_2", "Apply to each" genéricos — usa "Listar
-   contratos por vencer", "¿Faltan 30 días?", etc. Un flujo se lee por sus
+   productos con stock bajo", "¿Stock < 10?", etc. Un flujo se lee por sus
    nombres de pasos.
 3. Audita hasta 100: `python "${CLAUDE_PLUGIN_ROOT}/scripts/auditar_flujo.py" trabajo.json --json`
 

@@ -121,9 +121,9 @@ el catálogo al día. Pesos: ALTA 15 · MEDIA 7 · BAJA 3 · INFO 0 (se descuent
 
 Basada en Microsoft Learn + Matthew Devaney + Forward Forever:
 
-- **Flujo:** `[Área] - Verbo + resultado + (disparador)`. Ej: *"Legal - Alerta vencimiento de contratos (Programado)"*.
-- **Acciones:** nombre descriptivo de lo que hacen. Ej: *"Listar contratos vigentes"*, no *"Get items"*.
-- **Variables:** prefijo + camelCase. Ej: `varDiasRestantes`, `varContratos`.
+- **Flujo:** `[Área] - Verbo + resultado + (disparador)`. Ej: *"Inventario - Aviso de stock bajo (Programado)"*.
+- **Acciones:** nombre descriptivo de lo que hacen. Ej: *"Listar productos con stock bajo"*, no *"Get items"*.
+- **Variables:** prefijo + camelCase. Ej: `varDiasRestantes`, `varProductos`.
 - **Scopes de error:** `Try`, `Catch`, `Finally`.
 - Documentar la convención y comentar con *Notes* las decisiones no obvias.
 

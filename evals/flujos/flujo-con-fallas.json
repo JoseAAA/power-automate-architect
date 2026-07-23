@@ -9,7 +9,7 @@
           "type": "OpenApiConnection",
           "inputs": {
             "host": { "connectionName": "shared_sharepointonline", "operationId": "GetOnNewItems", "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
-            "parameters": { "dataset": "https://contoso.sharepoint.com/sites/legal", "table": "contratos" }
+            "parameters": { "dataset": "https://contoso.sharepoint.com/sites/ventas", "table": "pedidos" }
           }
         }
       },
@@ -25,7 +25,7 @@
           "runtimeConfiguration": { "staticResult": { "name": "GetItems0", "staticResultOptions": "Enabled" } },
           "inputs": {
             "host": { "connectionName": "shared_sharepointonline", "operationId": "GetItems", "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
-            "parameters": { "dataset": "https://contoso.sharepoint.com/sites/legal", "table": "contratos" }
+            "parameters": { "dataset": "https://contoso.sharepoint.com/sites/ventas", "table": "pedidos" }
           }
         },
         "HTTP": {
@@ -60,7 +60,7 @@
                       "type": "OpenApiConnection",
                       "inputs": {
                         "host": { "connectionName": "shared_sharepointonline", "operationId": "PatchItem", "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline" },
-                        "parameters": { "dataset": "https://contoso.sharepoint.com/sites/legal", "table": "contratos" }
+                        "parameters": { "dataset": "https://contoso.sharepoint.com/sites/ventas", "table": "pedidos" }
                       }
                     }
                   }

@@ -10,13 +10,11 @@ venv/
 token_cache*.json
 .msal_cache*
 
-# Flujos del usuario (datos potencialmente sensibles)
+# Flujos del usuario y ejemplos (datos potencialmente sensibles: NUNCA versionar)
+# Los exports reales se leen localmente aqui; no suben al repo.
 *.zip
 flujos-locales/
-
-# Ejemplos SANEADOS para entender el formato (sí se versionan; deben ir sin datos reales)
-!ejemplos/
-!ejemplos/**
+ejemplos/
 
 # SO / editor
 .DS_Store

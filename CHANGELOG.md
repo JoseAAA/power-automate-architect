@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.2] — 2026-07-20 · Privacidad: ejemplos genéricos y neutrales
+
+### Cambiado
+- **Ningún dato de empresa en el repo** (verificado en todo el historial). Los
+  ejemplos que tenían tema "legal/contratos" (genéricos, sin identificadores) se
+  neutralizaron al dominio de inventario/ventas para que no se parezcan a ningún
+  flujo real: catálogo de nomenclatura, plantilla `alerta-programada.json`,
+  `flujo-limpio.json`, `flujo-dataverse.json`, `flujo-con-fallas.json`.
+- `ejemplos/` y `flujos-locales/` y `*.zip` quedan **ignorados** por git: los
+  exports reales se estudian solo en local, nunca se versionan.
+
 ## [1.7.1] — 2026-07-20 · Copiloto presenta todas las opciones (gratis y premium)
 
 ### Mejorado
