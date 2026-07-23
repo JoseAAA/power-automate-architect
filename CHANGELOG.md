@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.10.0] — 2026-07-20 · Modificar por .zip de solución + clásico prohibido
+
+### Agregado — modificar por round-trip de solución (confiable, "como el experto")
+- **Nuevo flujo de modificar** (arreglo del dolor #1): `exportar-flujo <ID> --a
+  f.json` da el **JSON REAL** del flujo (de `ExportSolution`, ya con
+  `$authentication`/connection references); el agente edita ese JSON; `actualizar
+  <ID> --archivo f.json --si` hace **export→editar→import** de la solución con
+  respaldo del zip anterior. Robusto porque edita el paquete válido que genera
+  Microsoft, no uno armado a mano (evita "missing $authentication" / "parámetros
+  no válidos"). `ExportSolution`/`ImportSolution`/`AddSolutionComponent` (tipo 29,
+  verificado en Microsoft Learn). Método validado en vivo; prueba offline 6/6.
+- **Prohibido el diseñador clásico**: se eliminó `--clasico`; crear es SIEMPRE
+  moderno (el clásico está descontinuado y fallaba).
+
+### Importante — requiere permisos de solución
+- La vía de solución (crear moderno + modificar por zip) **requiere que tu cuenta
+  tenga rol de personalizador (System Customizer / Creador del entorno)** en el
+  entorno. Sin ese rol, ni el portal ni la herramienta pueden crear/editar flujos
+  en solución (error 403 / "does not have ReadAccess"). Mensaje de error claro
+  que lo explica.
+
 ## [1.9.0] — 2026-07-20 · Conexiones en blanco por defecto + round-trip .zip validado
 
 ### Cambiado — al crear, las conexiones se dejan SIN enlazar (el usuario las conecta)

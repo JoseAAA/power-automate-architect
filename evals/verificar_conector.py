@@ -17,11 +17,14 @@ y verifica lectura Y escritura:
 
   python evals/verificar_conector.py     -> exit 0 si todo pasa, 1 si algo falla
 """
+import base64
+import io
 import json
 import re
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -35,10 +38,34 @@ URLS_PEDIDAS = []
 CAPTURADO = {}  # metodo+patron -> (url, cuerpo, cabeceras)
 
 DV_API = "https://contoso.api.crm.dynamics.com"
+WF_ZIP_ID = "aaaabbbb-0000-0000-0000-000000000009"
 
 
-def _http_falso(metodo, url, token, cuerpo=None, intentos=3, cabeceras=None, con_cabeceras=False):
+def _solucion_zip(definicion):
+    """Un .zip de solucion minimo con un Workflows/*.json (para probar el round-trip)."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("solution.xml",
+                   "<ImportExportXml><Version>1.0.0.5</Version></ImportExportXml>")
+        z.writestr("customizations.xml", "<ImportExportXml/>")
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr(f"Workflows/Test-{WF_ZIP_ID}.json", json.dumps({"properties": {
+            "connectionReferences": {"x": {"connection": {"connectionReferenceLogicalName": "pak_x"}}},
+            "definition": definicion}, "schemaVersion": "1.0.0.0"}, ensure_ascii=False))
+    return buf.getvalue()
+
+
+def _http_falso(metodo, url, token, cuerpo=None, intentos=3, cabeceras=None,
+                con_cabeceras=False, timeout=60):
     URLS_PEDIDAS.append(f"{metodo} {url}")
+    # --- round-trip de solucion (.zip) ---
+    if metodo == "POST" and url.endswith("/ExportSolution"):
+        return {"ExportSolutionFile": base64.b64encode(_solucion_zip(FLUJO_LIMPIO["definition"])).decode()}
+    if metodo == "POST" and url.endswith("/ImportSolution"):
+        CAPTURADO["import_sol"] = (url, cuerpo, cabeceras)
+        return {}
+    if metodo == "POST" and url.endswith("/AddSolutionComponent"):
+        return {}
     # --- lecturas maker API ---
     if metodo == "GET" and "/environments?" in url:
         return {"value": [
@@ -85,6 +112,8 @@ def _http_falso(metodo, url, token, cuerpo=None, intentos=3, cabeceras=None, con
                                "clientdata": json.dumps({"properties": {
                                    "connectionReferences": {}, "definition": {"vieja": True}},
                                    "schemaVersion": "1.0.0.0"})}]}
+        if WF_ZIP_ID in url:
+            return {"value": [{"workflowid": WF_ZIP_ID, "name": "Test"}]}
         return {"value": []}  # FLOWLEGACY: sin fila -> legacy
     if metodo == "PATCH" and f"{DV_API}/api/data/v9.2/workflows(wf-123)" in url:
         CAPTURADO["patch_dv"] = (url, cuerpo, cabeceras)
@@ -354,6 +383,26 @@ def main():
     check("moderno: la connref de SharePoint lleva connectionid enlazado",
           any((c[1] or {}).get("connectionid") == "conn-sp-real"
               for c in CAPTURADO.get("post_connref", [])))
+
+    # 15. MODIFICAR por .zip de solucion (export -> editar JSON real -> import)
+    wf = pa_api.exportar_flujo_json(tok, "Default-tenant1", WF_ZIP_ID)
+    check("zip: exportar-flujo devuelve el JSON REAL (con connectionReferences)",
+          "connectionReferences" in wf.get("properties", {}) and "definition" in wf.get("properties", {}))
+    wf["properties"]["definition"]["triggers"] = {"nuevo": {"type": "Recurrence"}}  # editar
+    CAPTURADO.pop("import_sol", None)
+    res_zip = pa_api.modificar_flujo_zip(tok, "Default-tenant1", WF_ZIP_ID, wf)
+    check("zip: via solución .zip", res_zip.get("via", "").startswith("solución .zip"))
+    check("zip: respaldo del zip anterior creado", Path(res_zip.get("respaldo", "")).is_file())
+    imp_b64 = (CAPTURADO.get("import_sol", ("", {}, {}))[1] or {}).get("CustomizationFile", "")
+    zimp = zipfile.ZipFile(io.BytesIO(base64.b64decode(imp_b64)))
+    wf_name = next(n for n in zimp.namelist() if n.startswith("Workflows/"))
+    wf_imp = json.loads(zimp.read(wf_name).decode("utf-8"))
+    check("zip: el import lleva la definicion EDITADA",
+          "nuevo" in wf_imp["properties"]["definition"]["triggers"])
+    check("zip: subio la version de la solucion (1.0.0.5 -> 1.0.0.6)",
+          "1.0.0.6" in zimp.read("solution.xml").decode("utf-8"))
+    check("zip: el import lleva OverwriteUnmanagedCustomizations",
+          (CAPTURADO.get("import_sol", ("", {}, {}))[1] or {}).get("OverwriteUnmanagedCustomizations") is True)
 
     print("-" * 50)
     print("TODO OK" if not fallas else f"{len(fallas)} verificacion(es) fallida(s)")
