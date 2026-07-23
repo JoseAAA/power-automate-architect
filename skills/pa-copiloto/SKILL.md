@@ -91,9 +91,13 @@ Rutas: `${CLAUDE_PLUGIN_ROOT}/skills/pa-copiloto/plantillas/`.
 
 ## Paso 3 — Personalizar y auditar
 1. Copia la plantilla a un archivo de trabajo y adapta: nombre del flujo
-   `[Área] - Verbo + resultado (Disparador)`, textos en español, fuentes de
-   datos reales del usuario. Mantén los `@parameters('X (demo_Y)')` como
-   variables de entorno y explícale que se configuran al importar.
+   `[Área] - Verbo + resultado (Disparador)`, textos en español, y **REEMPLAZA
+   los marcadores `@parameters('X (demo_Y)')` por los datos REALES del usuario**
+   (URL del sitio de SharePoint, nombre de la lista, correos…). Pregúntaselos si
+   no los tienes. ⚠️ Si dejas los `@parameters(...)` de demo, el flujo abre pero
+   NO corre: la acción falla con *"missing required property 'dataset'"* porque
+   apunta a un sitio/lista que no existe. (Lo ideal a futuro son Environment
+   Variables reales; para un flujo que funcione ya, valores reales directos bastan.)
 2. **Nombra CADA acción de forma descriptiva en español** (PA-NAME-01): nunca
    dejes "Compose", "Condition_2", "Apply to each" genéricos — usa "Listar
    productos con stock bajo", "¿Stock < 10?", etc. Un flujo se lee por sus
