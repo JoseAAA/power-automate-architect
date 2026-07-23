@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.8.0] — 2026-07-20 · Prueba en vivo (jose.alarcon): precisión y hallazgos
+
+### Corregido — precisión del puntaje (PA-SEC-02 falso positivo)
+- El auditor marcaba PA-SEC-02 ("conexión embebida") en flujos de solución que SÍ
+  usan connection references. Ahora **no marca** si hay `connectionReferenceLogicalName`
+  (Shape B de Dataverse, o al tope en la maker API); solo marca conexiones
+  realmente embebidas sin referencia. Validado en vivo: el flujo moderno pasó de
+  90 → 97/100 (correcto), y la regresión sigue detectando las embebidas de verdad.
+
+### Validado en vivo con la cuenta de test
+- **Analizar/puntuar**: preciso (auditó flujos reales del tenant con hallazgos correctos).
+- **Crear (formato moderno)**: ✅ FUNCIONA. Creó un flujo de solución con
+  connection references reales (Shape B confirmado en Dataverse) y **enlazó solo
+  las conexiones existentes** del usuario. Ahora además **crea con la descripción**
+  del flujo. `crear_flujo_moderno` acepta `descripcion`.
+- **Modificar**: `actualizar_flujo` ahora **preserva las connection references
+  existentes** (no rompe el formato moderno) y asegura `parameters.$connections/
+  $authentication`. LÍMITE CONOCIDO: la modificación por API directa aún falla en
+  algunos flujos (ej. trigger Recurrence: "missing '$authentication'"). El arreglo
+  robusto es el **round-trip por `.zip` de solución** (export→editar→pack→import),
+  ya investigado; es el siguiente paso.
+
 ## [1.7.2] — 2026-07-20 · Privacidad: ejemplos genéricos y neutrales
 
 ### Cambiado
