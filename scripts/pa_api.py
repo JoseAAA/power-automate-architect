@@ -461,29 +461,30 @@ def _asegurar_connref(tok_dv, api, solucion, prefijo, conector, connection_id=No
 
 
 def crear_flujo_moderno(token, entorno, nombre, defn, connrefs,
-                        client_id=None, tenant=None, descripcion=""):
+                        client_id=None, tenant=None, descripcion="", enlazar_existentes=False):
     """Crea el flujo como flujo de SOLUCION con connection references (Shape B):
-    abre en el disenador moderno y cumple PA-SEC-02. Enlaza a conexiones
-    existentes del usuario cuando las encuentra; las que falten, el usuario las
-    autoriza una vez en el portal."""
+    abre en el disenador moderno y cumple PA-SEC-02. Por defecto las connection
+    references quedan SIN ENLAZAR: el usuario las conecta en el portal (un clic por
+    conector) — asi la creacion NO se traba buscando conexiones. Con
+    enlazar_existentes=True intenta pre-enlazar a conexiones que el usuario ya tenga."""
     inst, api = _entorno_dataverse(token, entorno)
     if not inst:
         raise PaApiError("El entorno no tiene Dataverse: no puedo crear en formato moderno. "
                          "Usa 'crear --clasico' (abre en el disenador clasico).")
     tok_dv = _token_dv(inst, client_id, tenant)
 
-    # conexiones existentes del usuario (para pre-enlazar y que se pueda encender sin tocar el portal)
     conn_por_conector = {}
-    try:
-        tok_pa, _ = _token_para(SCOPE_POWERAPPS, client_id=client_id, tenant=tenant)
-        for c in listar_conexiones(tok_pa, entorno):
-            p = c.get("properties", {}) or {}
-            if _conexion_rota(p):
-                continue
-            clave = str(p.get("apiId", "")).split("/")[-1]
-            conn_por_conector.setdefault(clave, c.get("name"))
-    except PaApiError:
-        pass  # sin conexiones pre-enlazadas: el usuario las autoriza en el portal
+    if enlazar_existentes:  # opcional: pre-enlazar a conexiones existentes (no pregunta, es silencioso)
+        try:
+            tok_pa, _ = _token_para(SCOPE_POWERAPPS, client_id=client_id, tenant=tenant)
+            for c in listar_conexiones(tok_pa, entorno):
+                p = c.get("properties", {}) or {}
+                if _conexion_rota(p):
+                    continue
+                clave = str(p.get("apiId", "")).split("/")[-1]
+                conn_por_conector.setdefault(clave, c.get("name"))
+        except PaApiError:
+            pass
 
     solucion, prefijo = _asegurar_solucion(tok_dv, api)
     nuevas, sin_enlazar = {}, []
@@ -1063,7 +1064,8 @@ def cmd_crear(args):
     else:
         r = crear_flujo_moderno(token, entorno, args.nombre, defn, connrefs,
                                 client_id=args.client_id, tenant=args.tenant,
-                                descripcion=descripcion)
+                                descripcion=descripcion,
+                                enlazar_existentes=getattr(args, "enlazar", False))
     print(f"\nFlujo '{args.nombre}' creado via {r['via']}.  ID: {r['workflowid']}")
     if r.get("solucion"):
         print(f"Solucion: {r['solucion']}")
@@ -1154,6 +1156,7 @@ def main():
     p.add_argument("--nombre", required=True, help="nombre del flujo nuevo")
     p.add_argument("--forzar", action="store_true", help="crear aunque la auditoria previa tenga ALTA")
     p.add_argument("--clasico", action="store_true", help="crear sin solucion (abre en el disenador clasico)")
+    p.add_argument("--enlazar", action="store_true", help="pre-enlazar a conexiones existentes (def: las dejas en blanco para el portal)")
     p.set_defaults(fn=cmd_crear)
     p = sub.add_parser("encender", help="Activar un flujo"); escritura(p)
     p.add_argument("flow_id"); p.set_defaults(fn=lambda a: cmd_estado(a, True))
