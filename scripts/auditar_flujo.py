@@ -536,9 +536,20 @@ def auditar(defn, connrefs, descripcion=""):
         if SECRET_RE.search(ins):
             add("PA-SEC-01", f"accion '{nombre}'")
 
-    # ---- PA-SEC-02: conexiones embebidas
+    # ---- PA-SEC-02: conexiones embebidas (SIN connection reference)
+    # Ojo: un flujo de solucion trae connectionReferenceLogicalName (Shape B en
+    # Dataverse, o al tope en la maker API) — eso SI es connection reference, no
+    # debe marcarse. Solo es "embebida" si source=Embedded y no hay logical name.
+    def _tiene_connref_logical(v):
+        if not isinstance(v, dict):
+            return False
+        if v.get("connectionReferenceLogicalName"):
+            return True  # forma de la maker API
+        conn = v.get("connection")
+        return isinstance(conn, dict) and bool(conn.get("connectionReferenceLogicalName"))
     embebidas = [k for k, v in (connrefs or {}).items()
-                 if isinstance(v, dict) and str(v.get("source", "")).lower() == "embedded"]
+                 if isinstance(v, dict) and str(v.get("source", "")).lower() == "embedded"
+                 and not _tiene_connref_logical(v)]
     if embebidas:
         add("PA-SEC-02", f"{len(embebidas)} conexion(es): {', '.join(embebidas)}")
 

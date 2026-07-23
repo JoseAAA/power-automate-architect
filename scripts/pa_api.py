@@ -315,14 +315,14 @@ def buscar_workflow(tok_dv, api_base, flow_id):
 
 
 def _cargar_definicion_archivo(ruta):
-    """Lee un .json (formato completo o definicion pelada) -> (definition, connrefs)."""
+    """Lee un .json (formato completo o definicion pelada) -> (definition, connrefs, descripcion)."""
     obj = json.loads(Path(ruta).read_text(encoding="utf-8"))
     props = obj.get("properties", obj) if isinstance(obj, dict) else {}
     defn = props.get("definition") or (obj if "actions" in obj and "triggers" in obj else None)
     if not defn:
         raise PaApiError(f"{ruta} no contiene una definicion valida (triggers/actions).")
     connrefs = props.get("connectionReferences") or {}
-    return defn, connrefs
+    return defn, connrefs, props.get("description", "")
 
 
 def _respaldar(token, entorno, flow_id):
@@ -357,8 +357,11 @@ def actualizar_flujo(token, entorno, flow_id, defn, connrefs=None,
         if fila:
             cd = json.loads(fila.get("clientdata") or "{}")
             props = cd.setdefault("properties", {})
-            props["definition"] = defn
-            if connrefs:
+            props["definition"] = _asegurar_parametros_definicion(defn)
+            # PRESERVAR las connection references existentes (Shape B de solucion);
+            # no pisarlas con la forma de la maker API (romperia el diseñador moderno).
+            # Solo asignar si el flujo aun no tenia ninguna.
+            if connrefs and not props.get("connectionReferences"):
                 props["connectionReferences"] = connrefs
             _http("PATCH", f"{api}/api/data/v9.2/workflows({fila['workflowid']})",
                   tok_dv, {"clientdata": json.dumps(cd, ensure_ascii=False)},
@@ -458,7 +461,7 @@ def _asegurar_connref(tok_dv, api, solucion, prefijo, conector, connection_id=No
 
 
 def crear_flujo_moderno(token, entorno, nombre, defn, connrefs,
-                        client_id=None, tenant=None):
+                        client_id=None, tenant=None, descripcion=""):
     """Crea el flujo como flujo de SOLUCION con connection references (Shape B):
     abre en el disenador moderno y cumple PA-SEC-02. Enlaza a conexiones
     existentes del usuario cuando las encuentra; las que falten, el usuario las
@@ -493,11 +496,14 @@ def crear_flujo_moderno(token, entorno, nombre, defn, connrefs,
                             "connection": {"connectionReferenceLogicalName": logical},
                             "api": {"name": conector}}
 
-    cd = {"properties": {"connectionReferences": nuevas, "definition": defn},
+    cd = {"properties": {"connectionReferences": nuevas,
+                         "definition": _asegurar_parametros_definicion(defn)},
           "schemaVersion": "1.0.0.0"}
-    wf_id = _dv_post(tok_dv, api, "workflows", {
-        "category": 5, "name": nombre, "type": 1, "primaryentity": "none",
-        "clientdata": json.dumps(cd, ensure_ascii=False)}, solucion=solucion)
+    cuerpo = {"category": 5, "name": nombre, "type": 1, "primaryentity": "none",
+              "clientdata": json.dumps(cd, ensure_ascii=False)}
+    if descripcion:
+        cuerpo["description"] = descripcion
+    wf_id = _dv_post(tok_dv, api, "workflows", cuerpo, solucion=solucion)
     return {"via": "dataverse (solución, formato moderno)", "workflowid": wf_id,
             "solucion": solucion, "conexiones_sin_enlazar": sin_enlazar}
 
@@ -768,6 +774,17 @@ def cmd_auditar(args):
         return r.returncode
 
 
+def _asegurar_parametros_definicion(defn):
+    """Un flujo de solucion con conectores requiere parameters.$connections y
+    $authentication en la definicion; si faltan, Dataverse rechaza el update
+    (error InvalidPowerFlow / missing '$authentication')."""
+    if isinstance(defn, dict):
+        params = defn.setdefault("parameters", {})
+        params.setdefault("$connections", {"defaultValue": {}, "type": "Object"})
+        params.setdefault("$authentication", {"defaultValue": {}, "type": "SecureObject"})
+    return defn
+
+
 def _connrefs_dict(connrefs):
     if isinstance(connrefs, list):
         return {str(c.get("connectionName") or j): c for j, c in enumerate(connrefs)}
@@ -1003,8 +1020,9 @@ def _preparar_escritura(args, necesita_archivo=True):
     token, _ = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
     entorno = args.entorno or entorno_por_defecto(token)
     defn = connrefs = None
+    descripcion = ""
     if necesita_archivo:
-        defn, connrefs = _cargar_definicion_archivo(args.archivo)
+        defn, connrefs, descripcion = _cargar_definicion_archivo(args.archivo)
         codigo, salida = _preauditar(defn, connrefs)
         linea = next((l for l in salida.splitlines() if "PUNTUACION" in l), "")
         print(f"Auditoria previa de la definicion nueva: {linea.strip() or '?'}")
@@ -1015,11 +1033,11 @@ def _preparar_escritura(args, necesita_archivo=True):
                 "Corrigelos antes de subirla, o usa --forzar bajo tu responsabilidad.")
         if codigo == 2:
             raise PaApiError("No pude auditar el archivo: definicion invalida.")
-    return token, entorno, defn, connrefs
+    return token, entorno, defn, connrefs, descripcion
 
 
 def cmd_actualizar(args):
-    token, entorno, defn, connrefs = _preparar_escritura(args)
+    token, entorno, defn, connrefs, _desc = _preparar_escritura(args)
     if not args.si:
         print(f"\n[SIMULACION] Actualizaria el flujo {args.flow_id} en {entorno} "
               f"(con respaldo previo automatico). Agrega --si para ejecutar.")
@@ -1033,7 +1051,7 @@ def cmd_actualizar(args):
 
 
 def cmd_crear(args):
-    token, entorno, defn, connrefs = _preparar_escritura(args)
+    token, entorno, defn, connrefs, descripcion = _preparar_escritura(args)
     modo = "clasico (disenador antiguo)" if args.clasico else "moderno (solucion + connection references)"
     if not args.si:
         print(f"\n[SIMULACION] Crearia el flujo '{args.nombre}' en {entorno} "
@@ -1044,7 +1062,8 @@ def cmd_crear(args):
                         client_id=args.client_id, tenant=args.tenant)
     else:
         r = crear_flujo_moderno(token, entorno, args.nombre, defn, connrefs,
-                                client_id=args.client_id, tenant=args.tenant)
+                                client_id=args.client_id, tenant=args.tenant,
+                                descripcion=descripcion)
     print(f"\nFlujo '{args.nombre}' creado via {r['via']}.  ID: {r['workflowid']}")
     if r.get("solucion"):
         print(f"Solucion: {r['solucion']}")
@@ -1059,7 +1078,7 @@ def cmd_crear(args):
 
 
 def cmd_estado(args, encender):
-    token, entorno, _, _ = _preparar_escritura(args, necesita_archivo=False)
+    token, entorno, _, _, _ = _preparar_escritura(args, necesita_archivo=False)
     verbo = "encenderia" if encender else "apagaria"
     if not args.si:
         print(f"[SIMULACION] {verbo} el flujo {args.flow_id} en {entorno}. Agrega --si para ejecutar.")
