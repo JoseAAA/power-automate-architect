@@ -14,6 +14,10 @@ token_cache*.json
 *.zip
 flujos-locales/
 
+# Ejemplos SANEADOS para entender el formato (sí se versionan; deben ir sin datos reales)
+!ejemplos/
+!ejemplos/**
+
 # SO / editor
 .DS_Store
 Thumbs.db
