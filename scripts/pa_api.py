@@ -20,6 +20,7 @@ Uso:
   python pa_api.py salud [--detalle f.json]  Conexiones rotas, flujos afectados, suspendidos
   python pa_api.py actualizar <flowId> --archivo f.json --si   Modifica un flujo (con respaldo)
   python pa_api.py crear --archivo f.json --nombre "X" --si    Crea un flujo (nace apagado)
+  python pa_api.py crear ... --solo-zip     Solo genera el .zip importable (no toca el tenant)
   python pa_api.py encender <flowId> --si  Activa un flujo
   python pa_api.py apagar <flowId> --si    Desactiva un flujo
   python pa_api.py logout                  Borra la sesion local
@@ -663,6 +664,259 @@ def modificar_flujo_zip(token, entorno, flow_id, workflows_json, client_id=None,
 
 
 # ---------------------------------------------------------------------------
+# CONSTRUIR un .zip de solucion importable DESDE CERO (sin exportar del tenant).
+# Sirve para el fallback "sin permisos": si tu cuenta no puede crear/modificar en
+# el tenant, dejamos el .zip listo en tu carpeta y lo importas a mano en el portal
+# (Soluciones > Importar solucion). El objetivo: SIEMPRE hay un resultado usable.
+#
+# Estructura verificada contra fuentes de Microsoft (no inventada):
+#  - solution.xml: manifiesto real (ImportExportXml/SolutionManifest/Publisher/
+#    RootComponents). RootComponent de un flujo = type="29" id="{guid}" behavior="0"
+#    (verbatim de un export real). ComponentType 29 = Workflow (MS Learn).
+#  - Workflows/<Nombre>-<GUID>.json = el "clientdata" (properties.connectionReferences
+#    + properties.definition + schemaVersion) — shape verbatim de MS Learn
+#    "Work with cloud flows using code".
+#  - customizations.xml: <Workflows>/<Workflow> + <connectionreferences> (shape de
+#    temmyraharjo, export real). [Content_Types].xml = OPC estandar.
+# NOTA: la validez estructural se prueba offline (eval); la aceptacion por el
+# validador de Microsoft se confirma con UNA importacion real antes de prometerla.
+# ---------------------------------------------------------------------------
+def _xml_escape(s):
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+
+def _slug_flujo(nombre):
+    s = re.sub(r"[^A-Za-z0-9]+", "", str(nombre or ""))
+    return s or "Flujo"
+
+
+CONTENT_TYPES_XML = (
+    '<?xml version="1.0" encoding="utf-8"?>\r\n'
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    '<Default Extension="xml" ContentType="application/octet-stream" />'
+    '<Default Extension="json" ContentType="application/octet-stream" />'
+    '</Types>')
+
+_ADDRESS_XML = (
+    "        <Address>\r\n"
+    "          <AddressNumber>{n}</AddressNumber>\r\n"
+    "          <AddressTypeCode>1</AddressTypeCode>\r\n"
+    '          <City xsi:nil="true"></City>\r\n'
+    '          <County xsi:nil="true"></County>\r\n'
+    '          <Country xsi:nil="true"></Country>\r\n'
+    '          <Fax xsi:nil="true"></Fax>\r\n'
+    '          <FreightTermsCode xsi:nil="true"></FreightTermsCode>\r\n'
+    '          <ImportSequenceNumber xsi:nil="true"></ImportSequenceNumber>\r\n'
+    '          <Latitude xsi:nil="true"></Latitude>\r\n'
+    '          <Line1 xsi:nil="true"></Line1>\r\n'
+    '          <Line2 xsi:nil="true"></Line2>\r\n'
+    '          <Line3 xsi:nil="true"></Line3>\r\n'
+    '          <Longitude xsi:nil="true"></Longitude>\r\n'
+    '          <Name xsi:nil="true"></Name>\r\n'
+    '          <PostalCode xsi:nil="true"></PostalCode>\r\n'
+    '          <PostOfficeBox xsi:nil="true"></PostOfficeBox>\r\n'
+    '          <PrimaryContactName xsi:nil="true"></PrimaryContactName>\r\n'
+    "          <ShippingMethodCode>1</ShippingMethodCode>\r\n"
+    '          <StateOrProvince xsi:nil="true"></StateOrProvince>\r\n'
+    '          <Telephone1 xsi:nil="true"></Telephone1>\r\n'
+    '          <Telephone2 xsi:nil="true"></Telephone2>\r\n'
+    '          <Telephone3 xsi:nil="true"></Telephone3>\r\n'
+    '          <UPSZone xsi:nil="true"></UPSZone>\r\n'
+    '          <UTCOffset xsi:nil="true"></UTCOffset>\r\n'
+    "        </Address>\r\n")
+
+
+def _solution_xml(workflow_id, version="1.0.0.0", sol_unique=None, sol_friendly=None,
+                  pub_unique=None, pub_prefix=None, opt_value_prefix="72000"):
+    sol_unique = sol_unique or SOL_UNIQUE
+    sol_friendly = sol_friendly or SOL_FRIENDLY
+    pub_unique = pub_unique or PUB_UNIQUE
+    pub_prefix = pub_prefix or PUB_PREFIX
+    guid = "{" + str(workflow_id).strip("{}").lower() + "}"
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\r\n'
+        '<ImportExportXml version="9.2.24024.171" SolutionPackageVersion="9.2" '
+        'languagecode="1033" generatedBy="CrmLive" '
+        'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\r\n'
+        "  <SolutionManifest>\r\n"
+        f"    <UniqueName>{_xml_escape(sol_unique)}</UniqueName>\r\n"
+        "    <LocalizedNames>\r\n"
+        f'      <LocalizedName description="{_xml_escape(sol_friendly)}" languagecode="1033" />\r\n'
+        "    </LocalizedNames>\r\n"
+        "    <Descriptions />\r\n"
+        f"    <Version>{version}</Version>\r\n"
+        "    <Managed>0</Managed>\r\n"
+        "    <Publisher>\r\n"
+        f"      <UniqueName>{_xml_escape(pub_unique)}</UniqueName>\r\n"
+        "      <LocalizedNames>\r\n"
+        f'        <LocalizedName description="{_xml_escape(sol_friendly)}" languagecode="1033" />\r\n'
+        "      </LocalizedNames>\r\n"
+        "      <Descriptions />\r\n"
+        '      <EMailAddress xsi:nil="true"></EMailAddress>\r\n'
+        '      <SupportingWebsiteUrl xsi:nil="true"></SupportingWebsiteUrl>\r\n'
+        f"      <CustomizationPrefix>{_xml_escape(pub_prefix)}</CustomizationPrefix>\r\n"
+        f"      <CustomizationOptionValuePrefix>{opt_value_prefix}</CustomizationOptionValuePrefix>\r\n"
+        "      <Addresses>\r\n"
+        + _ADDRESS_XML.format(n=1) + _ADDRESS_XML.format(n=2) +
+        "      </Addresses>\r\n"
+        "    </Publisher>\r\n"
+        "    <RootComponents>\r\n"
+        f'      <RootComponent type="29" id="{guid}" behavior="0" />\r\n'
+        "    </RootComponents>\r\n"
+        "    <MissingDependencies />\r\n"
+        "  </SolutionManifest>\r\n"
+        "</ImportExportXml>\r\n")
+
+
+def _customizations_xml(workflow_id, nombre, json_file_name, connrefs_logicos):
+    guid = "{" + str(workflow_id).strip("{}").lower() + "}"
+    nombre_esc = _xml_escape(nombre)
+    wf = (
+        f'    <Workflow WorkflowId="{guid}" Name="{nombre_esc}">\r\n'
+        f"      <JsonFileName>{_xml_escape(json_file_name)}</JsonFileName>\r\n"
+        "      <Type>1</Type>\r\n"
+        "      <Subprocess>0</Subprocess>\r\n"
+        "      <Category>5</Category>\r\n"
+        "      <Mode>0</Mode>\r\n"
+        "      <Scope>4</Scope>\r\n"
+        "      <OnDemand>0</OnDemand>\r\n"
+        "      <TriggerOnCreate>0</TriggerOnCreate>\r\n"
+        "      <TriggerOnDelete>0</TriggerOnDelete>\r\n"
+        "      <AsyncAutodelete>0</AsyncAutodelete>\r\n"
+        "      <SyncWorkflowLogOnFailure>0</SyncWorkflowLogOnFailure>\r\n"
+        "      <StateCode>0</StateCode>\r\n"
+        "      <StatusCode>1</StatusCode>\r\n"
+        "      <RunAs>1</RunAs>\r\n"
+        "      <IsTransacted>1</IsTransacted>\r\n"
+        "      <IntroducedVersion>1.0.0.0</IntroducedVersion>\r\n"
+        "      <IsCustomizable>1</IsCustomizable>\r\n"
+        "      <BusinessProcessType>0</BusinessProcessType>\r\n"
+        "      <IsCustomProcessingStepAllowedForOtherPublishers>1</IsCustomProcessingStepAllowedForOtherPublishers>\r\n"
+        "      <PrimaryEntity>none</PrimaryEntity>\r\n"
+        "      <LocalizedNames>\r\n"
+        f'        <LocalizedName languagecode="1033" description="{nombre_esc}" />\r\n'
+        "      </LocalizedNames>\r\n"
+        "    </Workflow>\r\n")
+    refs = ""
+    for logical, conector in connrefs_logicos:
+        refs += (
+            f'    <connectionreference connectionreferencelogicalname="{_xml_escape(logical)}">\r\n'
+            f"      <connectionreferencedisplayname>{_xml_escape(conector)}</connectionreferencedisplayname>\r\n"
+            f"      <connectorid>/providers/Microsoft.PowerApps/apis/{_xml_escape(conector)}</connectorid>\r\n"
+            "      <iscustomizable>1</iscustomizable>\r\n"
+            "      <statecode>0</statecode>\r\n"
+            "      <statuscode>1</statuscode>\r\n"
+            "    </connectionreference>\r\n")
+    bloque_refs = (f"  <connectionreferences>\r\n{refs}  </connectionreferences>\r\n"
+                   if refs else "  <connectionreferences />\r\n")
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\r\n'
+        '<ImportExportXml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\r\n'
+        "  <Entities />\r\n"
+        "  <Roles />\r\n"
+        "  <Workflows>\r\n" + wf + "  </Workflows>\r\n"
+        "  <FieldSecurityProfiles />\r\n"
+        "  <Templates />\r\n"
+        "  <EntityMaps />\r\n"
+        "  <EntityRelationships />\r\n"
+        "  <OrganizationSettings />\r\n"
+        "  <optionsets />\r\n"
+        "  <CustomControls />\r\n"
+        "  <EntityDataProviders />\r\n"
+        + bloque_refs +
+        "  <Languages>\r\n"
+        "    <Language>1033</Language>\r\n"
+        "  </Languages>\r\n"
+        "</ImportExportXml>\r\n")
+
+
+def construir_solucion_zip(nombre, defn, connrefs, descripcion="", version="1.0.0.0",
+                           sol_unique=None, sol_friendly=None, pub_unique=None,
+                           pub_prefix=None, opt_value_prefix="72000"):
+    """Arma en memoria un .zip de solucion NO administrada importable, con un flujo
+    nuevo (nace apagado). Devuelve (zip_bytes, info). Sin red: 100% local.
+    connrefs = dict {conector: <cualquier cosa>}; solo se usan las CLAVES (los
+    conectores). Las connection references quedan SIN ENLAZAR (el que importe las
+    conecta en el portal), tal como pide el flujo por defecto.
+    La identidad de solucion/publisher es parametrizable (para pruebas aisladas)."""
+    pub_prefix = pub_prefix or PUB_PREFIX
+    workflow_id = str(uuid.uuid4())
+    guid_archivo = workflow_id.replace("-", "").upper()
+    slug = _slug_flujo(nombre)
+    entrada_wf = f"Workflows/{slug}-{guid_archivo}.json"
+    json_file_name = f"/Workflows/{slug}-{guid_archivo}.json"
+
+    conectores = list((connrefs or {}).keys())
+    connrefs_clientdata, connrefs_logicos = {}, []
+    for conector in conectores:
+        logical = f"{pub_prefix}_{conector}".lower().replace("-", "_")
+        connrefs_clientdata[conector] = {
+            "runtimeSource": "embedded",
+            "connection": {"connectionReferenceLogicalName": logical},
+            "api": {"name": conector}}
+        connrefs_logicos.append((logical, conector))
+
+    clientdata = {"properties": {"connectionReferences": connrefs_clientdata,
+                                 "definition": _asegurar_parametros_definicion(defn)},
+                  "schemaVersion": "1.0.0.0"}
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
+        z.writestr("solution.xml", _solution_xml(
+            workflow_id, version, sol_unique, sol_friendly, pub_unique,
+            pub_prefix, opt_value_prefix))
+        z.writestr("customizations.xml",
+                   _customizations_xml(workflow_id, nombre, json_file_name, connrefs_logicos))
+        z.writestr(entrada_wf, json.dumps(clientdata, ensure_ascii=False, indent=2))
+    info = {"workflowid": workflow_id, "archivo_interno": entrada_wf,
+            "conexiones_sin_enlazar": conectores}
+    return buf.getvalue(), info
+
+
+def guardar_zip_local(zip_bytes, nombre, carpeta=None):
+    """Guarda el .zip importable en ./flujos-locales/ (dentro de la carpeta del
+    proyecto/Claude Code) y devuelve la ruta. Esa carpeta esta en .gitignore."""
+    carpeta = Path(carpeta) if carpeta else (Path.cwd() / "flujos-locales")
+    carpeta.mkdir(parents=True, exist_ok=True)
+    marca = time.strftime("%Y%m%d-%H%M%S")
+    ruta = carpeta / f"{_slug_flujo(nombre)}-{marca}.zip"
+    ruta.write_bytes(zip_bytes)
+    return ruta
+
+
+def _instrucciones_importar(ruta_zip, sin_enlazar):
+    """Texto en español, para el usuario, de como importar el .zip a mano."""
+    pasos = [
+        "",
+        "📦 Te dejé el flujo listo como .zip de solución (importable a mano):",
+        f"   {ruta_zip}",
+        "",
+        "Para ponerlo en Power Automate (no necesitas que yo tenga permisos):",
+        "  1. Entra a https://make.powerautomate.com  (arriba a la derecha, elige el entorno correcto).",
+        "  2. En el menú izquierdo abre  Soluciones.",
+        "  3. Click en  Importar solución  →  Examinar  →  elige el .zip de arriba  →  Siguiente.",
+        "  4. Click en  Importar  y espera a que termine (aparece en la lista de soluciones).",
+        "  5. Abre la solución y luego el flujo: nace APAGADO.",
+    ]
+    if sin_enlazar:
+        pasos += [
+            f"  6. Conecta sus conexiones (una vez): {', '.join(sin_enlazar)}.",
+            "     (el diseñador te pedirá elegir/crear cada conexión al abrir el flujo).",
+            "  7. Guarda y enciéndelo.",
+        ]
+    else:
+        pasos += ["  6. Guárdalo y enciéndelo."]
+    pasos += [
+        "",
+        "Si otra persona de tu equipo es quien tiene permisos, pásale ese .zip: "
+        "ella hace los mismos pasos.",
+    ]
+    return "\n".join(pasos)
+
+
+# ---------------------------------------------------------------------------
 # Comandos
 # ---------------------------------------------------------------------------
 def _fecha(s):
@@ -1215,17 +1469,49 @@ def cmd_actualizar(args):
 
 def cmd_crear(args):
     token, entorno, defn, connrefs, descripcion = _preparar_escritura(args)
+
+    # Ruta rapida "--solo-zip": NO toca el tenant; deja el .zip importable listo en
+    # tu carpeta. Util cuando ya sabes que no tienes permisos, o quieres el archivo
+    # para pasarselo a quien sí los tiene. Es local y no destructivo: no pide --si.
+    if getattr(args, "solo_zip", False):
+        zip_bytes, info = construir_solucion_zip(args.nombre, defn, connrefs, descripcion)
+        ruta = guardar_zip_local(zip_bytes, args.nombre, getattr(args, "carpeta", None))
+        print(f"\nFlujo '{args.nombre}' empaquetado como solución (NO se subió al tenant; --solo-zip).")
+        print(_instrucciones_importar(ruta, info["conexiones_sin_enlazar"]))
+        return 0
+
     if not args.si:
         print(f"\n[SIMULACION] Crearia el flujo '{args.nombre}' en {entorno} "
-              f"en formato moderno (solucion + connection references; nace APAGADO). "
-              "Agrega --si para ejecutar.")
+              "en formato moderno (solucion + connection references; nace APAGADO). "
+              "Si tu cuenta no tiene permisos, en su lugar dejaria el .zip importable "
+              "en ./flujos-locales/ con instrucciones. Agrega --si para ejecutar "
+              "(o --solo-zip para solo generar el .zip, sin tocar el tenant).")
         return 0
+
     # SIEMPRE formato moderno. El disenador clasico esta prohibido (falla por
     # defecto y esta descontinuado en Power Automate).
-    r = crear_flujo_moderno(token, entorno, args.nombre, defn, connrefs,
-                            client_id=args.client_id, tenant=args.tenant,
-                            descripcion=descripcion,
-                            enlazar_existentes=getattr(args, "enlazar", False))
+    try:
+        r = crear_flujo_moderno(token, entorno, args.nombre, defn, connrefs,
+                                client_id=args.client_id, tenant=args.tenant,
+                                descripcion=descripcion,
+                                enlazar_existentes=getattr(args, "enlazar", False))
+    except PaApiError as e:
+        # Fallback (lo que pediste): si no se pudo crear en el tenant, SIEMPRE dejamos
+        # un resultado usable -> el .zip importable en tu carpeta + como subirlo a mano.
+        zip_bytes, info = construir_solucion_zip(args.nombre, defn, connrefs, descripcion)
+        ruta = guardar_zip_local(zip_bytes, args.nombre, getattr(args, "carpeta", None))
+        es_permisos = any(t in str(e).lower() for t in
+                          ("403", "permiso", "privilege", "does not have",
+                           "readaccess", "personalizador"))
+        print("\nNo pude crear el flujo directamente en tu tenant.")
+        print(f"Motivo técnico: {e}")
+        if es_permisos:
+            print("\n➡️  Es un tema de PERMISOS: tu cuenta no puede crear flujos de solución en "
+                  "este entorno (falta el rol de Creador del entorno / personalizador). No pasa "
+                  "nada: te dejo el flujo empaquetado para importarlo a mano.")
+        print(_instrucciones_importar(ruta, info["conexiones_sin_enlazar"]))
+        return 0
+
     print(f"\nFlujo '{args.nombre}' creado via {r['via']}.  ID: {r['workflowid']}")
     if r.get("solucion"):
         print(f"Solucion: {r['solucion']}")
@@ -1320,6 +1606,9 @@ def main():
     p.add_argument("--nombre", required=True, help="nombre del flujo nuevo")
     p.add_argument("--forzar", action="store_true", help="crear aunque la auditoria previa tenga ALTA")
     p.add_argument("--enlazar", action="store_true", help="pre-enlazar a conexiones existentes (def: las dejas en blanco para el portal)")
+    p.add_argument("--solo-zip", action="store_true", dest="solo_zip",
+                   help="NO tocar el tenant: solo generar el .zip importable en ./flujos-locales/")
+    p.add_argument("--carpeta", help="carpeta donde dejar el .zip (def: ./flujos-locales/)")
     p.set_defaults(fn=cmd_crear)
     p = sub.add_parser("encender", help="Activar un flujo"); escritura(p)
     p.add_argument("flow_id"); p.set_defaults(fn=lambda a: cmd_estado(a, True))
