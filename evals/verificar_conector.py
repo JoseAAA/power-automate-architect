@@ -356,13 +356,22 @@ def main():
             "statuses": [{"status": "Connected"}]}},
     ]
     CAPTURADO.pop("post_connref", None)
-    # por defecto: conexiones SIN enlazar (el usuario las conecta en el portal)
+    # POR DEFECTO ahora REUTILIZA conexiones existentes (SharePoint tiene una sana ->
+    # se pre-enlaza; Office365 no tiene -> queda por autorizar). Evita duplicados.
     res_def = pa_api.crear_flujo_moderno(
         tok, "Default-tenant1", "Flujo default",
         FLUJO_LIMPIO["definition"], FLUJO_LIMPIO.get("connectionReferences", {}))
-    check("moderno: por defecto deja TODAS las conexiones sin enlazar",
-          set(res_def.get("conexiones_sin_enlazar", [])) == {"shared_sharepointonline", "shared_office365"})
-    # con --enlazar: pre-enlaza a las existentes
+    check("moderno: por defecto REUTILIZA la conexión existente (SP se enlaza, O365 no)",
+          res_def.get("conexiones_sin_enlazar") == ["shared_office365"])
+    # con --sin-enlazar: deja TODAS en blanco
+    CAPTURADO.pop("post_connref", None)
+    res_sin = pa_api.crear_flujo_moderno(
+        tok, "Default-tenant1", "Flujo en blanco",
+        FLUJO_LIMPIO["definition"], FLUJO_LIMPIO.get("connectionReferences", {}),
+        enlazar_existentes=False)
+    check("moderno: con --sin-enlazar deja TODAS las conexiones sin enlazar",
+          set(res_sin.get("conexiones_sin_enlazar", [])) == {"shared_sharepointonline", "shared_office365"})
+    # (el pre-enlazado por defecto es el camino principal)
     CAPTURADO.pop("post_connref", None)
     res_m = pa_api.crear_flujo_moderno(
         tok, "Default-tenant1", "Flujo moderno demo",
@@ -388,6 +397,25 @@ def main():
     check("moderno: la connref de SharePoint lleva connectionid enlazado",
           any((c[1] or {}).get("connectionid") == "conn-sp-real"
               for c in CAPTURADO.get("post_connref", [])))
+
+    # 14c. _asegurar_connref ENLAZA por PATCH una referencia que ya existe pero esta suelta
+    patched = {}
+    orig_http = pa_api._http
+
+    def _http_cr(metodo, url, token, cuerpo=None, **k):
+        if metodo == "GET" and "connectionreferences?" in url:
+            return {"value": [{"connectionreferenceid": "cr-exist", "connectionid": None}]}
+        if metodo == "PATCH" and "connectionreferences(cr-exist)" in url:
+            patched["body"], patched["headers"] = cuerpo, k.get("cabeceras")
+            return {}
+        return orig_http(metodo, url, token, cuerpo, **k)
+
+    pa_api._http = _http_cr
+    pa_api._asegurar_connref("tokdv", DV_API, "SolX", "pak", "shared_x", connection_id="conn-xyz")
+    pa_api._http = orig_http
+    check("connref: enlaza por PATCH una referencia existente-suelta (no crea otra)",
+          patched.get("body", {}).get("connectionid") == "conn-xyz"
+          and (patched.get("headers") or {}).get("If-Match") == "*")
 
     # 15. MODIFICAR por .zip de solucion (export -> editar JSON real -> import)
     wf = pa_api.exportar_flujo_json(tok, "Default-tenant1", WF_ZIP_ID)

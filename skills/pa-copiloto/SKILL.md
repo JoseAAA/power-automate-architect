@@ -141,17 +141,23 @@ autoriza ESAS connection references (una vez cada una), 2) vuelve y dime
 "enciéndelo" (`encender <ID> --si`), 3) valídalo con `corridas <ID>`. Si no faltó
 ninguna, salta directo a encenderlo.
 
-## Conexiones — NO te trabes con esto
+## Conexiones — NO te trabes con esto (y NO las dupliques)
 El flujo usa **connection references por nombre de conector** (ej.
 `shared_sharepointonline`); **NO necesitas los GUID de las conexiones reales** para
-crearlo. Por defecto `crear` deja las conexiones **SIN enlazar** y el flujo nace
-apagado: el usuario las conecta en el portal (un clic por conector) al abrirlo.
-- **No interrogues** por conexiones ni iteres buscándolas. Pregunta como MUCHO una
-  vez; si el usuario no las da, sigue igual y déjalas en blanco.
-- Al terminar, dile qué conectores debe enlazar (los que devuelve
-  `conexiones_sin_enlazar`) y que eso se hace una sola vez en make.powerautomate.com.
-- Solo si el usuario lo pide, `crear --enlazar` intenta pre-enlazar a conexiones
-  que ya tenga (silencioso, sin preguntar).
+crearlo. Por defecto `crear` **reutiliza en silencio la conexión sana que el usuario
+ya tenga** de cada conector (pre-enlaza): el flujo nace conectado y NO hay que
+"Agregar nuevo" en el portal → así **no se acumulan conexiones duplicadas** ni hay
+que reconectar en cada flujo. La herramienta usa UNA connection reference estable
+por conector y por cuenta, y la reutiliza en todos los flujos.
+- **No interrogues** por conexiones ni iteres buscándolas: el pre-enlazado es
+  automático y silencioso. No preguntes GUIDs.
+- Solo quedan **sin enlazar** los conectores para los que el usuario AÚN no tiene
+  ninguna conexión. Al terminar, dile SOLO esos (los de `conexiones_sin_enlazar`):
+  se autorizan una vez en make.powerautomate.com. Si no falta ninguno, ya quedó.
+- `crear --sin-enlazar` deja TODAS en blanco (rara vez hace falta; por defecto NO).
+- ⚠️ Si el usuario reporta conexiones duplicadas, es de flujos viejos: reusar (el
+  default de ahora) lo evita hacia adelante; limpiar las viejas es manual en el
+  portal (Conexiones), dejando una sana por conector, y NO se borra sin su OK.
 
 ## Reglas
 - Nunca entregues un flujo que no audite 🟢 (≥90); ideal 100.

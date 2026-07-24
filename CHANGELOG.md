@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.15.0] — 2026-07-24 · Reusar conexiones por defecto (no más duplicados)
+
+### Cambiado — al crear, se REUTILIZA la conexión existente (antes: en blanco)
+- Causa de las conexiones duplicadas: la herramienta creaba los flujos con las
+  connection references **sin enlazar**; Power Automate, al abrir/guardar/encender
+  un flujo con una referencia suelta, **provisiona una conexión automáticamente**.
+  Repetido en cada flujo/modificación → se acumulaban conexiones sin que el usuario
+  hiciera "Agregar nuevo". (La herramienta NUNCA crea conexiones: solo las lista y
+  crea *connection references*.)
+- Ahora `crear` **reutiliza en silencio** una conexión sana que el usuario ya tenga
+  de cada conector (pre-enlaza la reference al crearla). El flujo nace conectado y
+  no hay nada suelto que Power Automate deba auto-provisionar → no se duplican.
+  Solo quedan "sin enlazar" los conectores para los que aún no existe ninguna
+  conexión. `--sin-enlazar` para volver al comportamiento anterior (en blanco).
+- `_asegurar_connref` ahora también **enlaza una reference que ya existía suelta**
+  (PATCH), sin pisar una que el usuario ya haya enlazado. Una sola reference estable
+  por conector y cuenta, reutilizada en todos los flujos.
+
 ## [1.14.0] — 2026-07-24 · Auditor: límite de 256 en notas + arreglo de falso positivo
 
 ### Agregado — PA-DESC-01 (ALTA): descripción de acción > 256 caracteres

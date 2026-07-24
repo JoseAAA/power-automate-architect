@@ -481,28 +481,40 @@ def _asegurar_solucion(tok_dv, api, ident=None):
 
 
 def _asegurar_connref(tok_dv, api, solucion, prefijo, conector, connection_id=None):
-    """Asegura una connection reference para el conector; devuelve su logical name.
-    Si connection_id viene, la deja enlazada (el flujo se puede encender sin tocar el portal)."""
+    """Asegura UNA connection reference estable por conector; devuelve su logical name.
+    - Si no existe, la crea (enlazada si viene connection_id).
+    - Si YA existe pero está suelta y viene connection_id, la enlaza (así una
+      referencia creada por un flujo anterior queda usable sin reconectar).
+    - Si ya existe y está enlazada, NO la toca (respeta lo que enlazó el usuario).
+    Reutilizar la MISMA referencia evita que se acumulen conexiones duplicadas."""
     logical = f"{prefijo}_{conector}".lower().replace('-', '_')
     r = _dv_get(tok_dv, api, "connectionreferences?$filter=connectionreferencelogicalname eq "
-                             f"'{logical}'&$select=connectionreferenceid")
-    if not r.get("value"):
+                             f"'{logical}'&$select=connectionreferenceid,connectionid")
+    filas = r.get("value") or []
+    if not filas:
         cuerpo = {"connectionreferencelogicalname": logical,
                   "connectionreferencedisplayname": conector,
                   "connectorid": f"/providers/Microsoft.PowerApps/apis/{conector}"}
         if connection_id:
             cuerpo["connectionid"] = connection_id
         _dv_post(tok_dv, api, "connectionreferences", cuerpo, solucion=solucion)
+    elif connection_id and not filas[0].get("connectionid"):
+        crid = filas[0]["connectionreferenceid"]
+        _http("PATCH", f"{api}/api/data/v9.2/connectionreferences({crid})", tok_dv,
+              {"connectionid": connection_id}, cabeceras={"If-Match": "*"})
     return logical
 
 
 def crear_flujo_moderno(token, entorno, nombre, defn, connrefs,
-                        client_id=None, tenant=None, descripcion="", enlazar_existentes=False):
+                        client_id=None, tenant=None, descripcion="", enlazar_existentes=True):
     """Crea el flujo como flujo de SOLUCION con connection references (Shape B):
-    abre en el disenador moderno y cumple PA-SEC-02. Por defecto las connection
-    references quedan SIN ENLAZAR: el usuario las conecta en el portal (un clic por
-    conector) — asi la creacion NO se traba buscando conexiones. Con
-    enlazar_existentes=True intenta pre-enlazar a conexiones que el usuario ya tenga."""
+    abre en el disenador moderno y cumple PA-SEC-02. Por defecto REUTILIZA en
+    silencio una conexion sana que el usuario ya tenga de cada conector (pre-enlaza):
+    el flujo nace conectado y NO hay que 'Agregar nuevo' en el portal — asi no se
+    acumulan conexiones duplicadas ni hay que reconectar en cada flujo. Es silencioso
+    (no pregunta). Con enlazar_existentes=False las deja en blanco (el usuario las
+    conecta a mano). Solo quedan 'sin enlazar' los conectores para los que el usuario
+    aun NO tiene ninguna conexion."""
     inst, api = _entorno_dataverse(token, entorno)
     if not inst:
         raise PaApiError("El entorno no tiene Dataverse: no puedo crear en formato moderno "
@@ -1560,7 +1572,9 @@ def cmd_crear(args):
 
     if not args.si:
         print(f"\n[SIMULACION] Crearia el flujo '{args.nombre}' en {entorno} "
-              "en formato moderno (solucion + connection references; nace APAGADO). "
+              "en formato moderno (solucion + connection references; nace APAGADO), "
+              "reutilizando en silencio las conexiones que ya tengas (sin crear "
+              "duplicadas; usa --sin-enlazar para dejarlas en blanco). "
               "Si tu cuenta no tiene permisos, en su lugar dejaria el .zip importable "
               "en ./flujos-locales/ con instrucciones. Agrega --si para ejecutar "
               "(o --solo-zip para solo generar el .zip, sin tocar el tenant).")
@@ -1572,7 +1586,7 @@ def cmd_crear(args):
         r = crear_flujo_moderno(token, entorno, args.nombre, defn, connrefs,
                                 client_id=args.client_id, tenant=args.tenant,
                                 descripcion=descripcion,
-                                enlazar_existentes=getattr(args, "enlazar", False))
+                                enlazar_existentes=not getattr(args, "sin_enlazar", False))
     except PaApiError as e:
         # Fallback (lo que pediste): si no se pudo crear en el tenant, SIEMPRE dejamos
         # un resultado usable -> el .zip importable en tu carpeta + como subirlo a mano.
@@ -1596,10 +1610,12 @@ def cmd_crear(args):
         print(f"Solucion: {r['solucion']}")
     sin = r.get("conexiones_sin_enlazar")
     if sin:
-        print(f"Nace APAGADO. Conexiones a autorizar UNA vez en el portal: {', '.join(sin)}")
+        print(f"Nace APAGADO. Conexiones a autorizar UNA vez en el portal (aún no tienes "
+              f"conexión de esos conectores): {', '.join(sin)}")
         print("  (abre el flujo en make.powerautomate.com, enlaza esas connection references)")
     else:
-        print("Nace APAGADO (las conexiones ya quedaron enlazadas).")
+        print("Nace APAGADO. Las conexiones se reutilizaron de las que ya tenías "
+              "(no se crearon nuevas).")
     print(f"Enciendelo con:  python pa_api.py encender {r['workflowid']} --si")
     return 0
 
@@ -1685,7 +1701,8 @@ def main():
     escritura(p); p.add_argument("--archivo", required=True, help="ruta .json con la definicion")
     p.add_argument("--nombre", required=True, help="nombre del flujo nuevo")
     p.add_argument("--forzar", action="store_true", help="crear aunque la auditoria previa tenga ALTA")
-    p.add_argument("--enlazar", action="store_true", help="pre-enlazar a conexiones existentes (def: las dejas en blanco para el portal)")
+    p.add_argument("--sin-enlazar", action="store_true", dest="sin_enlazar",
+                   help="dejar las conexiones en blanco (def: reutiliza en silencio las que ya tengas)")
     p.add_argument("--solo-zip", action="store_true", dest="solo_zip",
                    help="NO tocar el tenant: solo generar el .zip importable en ./flujos-locales/")
     p.add_argument("--carpeta", help="carpeta donde dejar el .zip (def: ./flujos-locales/)")
