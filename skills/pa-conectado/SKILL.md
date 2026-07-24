@@ -51,6 +51,26 @@ references, etc.), NO uno armado a mano. Por eso no falla.
    (hace export→editar→import de la solución, con respaldo del zip anterior.)
 5. Valida con `corridas <ID>` y reporta en simple (+ ruta del respaldo).
 
+### ⛔ Reglas de oro al MODIFICAR (no desconectar, no duplicar)
+Un cambio de lógica NUNCA debe obligar al usuario a reconectar sus conexiones.
+- **Edita SOLO lo que cambia** dentro de `properties.definition`. NO pegues un flujo
+  entero rearmado a mano: parte del JSON exportado y toca solo la(s) acción(es) pedida(s).
+- **NO reescribas `properties.connectionReferences`.** El comando `actualizar` ya
+  preserva las connection references reales (los enlaces del usuario) aunque tu JSON
+  las traiga distintas — pero igual: no las inventes ni las renombres. Reutiliza sus
+  `connectionReferenceLogicalName` tal cual.
+- **Es el MISMO flujo (mismo ID).** Modificar = actualizar ese flujo, NUNCA crear
+  uno nuevo. Si `actualizar` falla por permisos, NO lo "resuelvas" creando un flujo
+  nuevo con otro nombre (eso pierde las conexiones y duplica): repórtalo y ofrece
+  el rol de personalizador o el `.zip` de actualización. Ver Permisos abajo.
+- **Descripciones de acción ≤ 256 caracteres.** Power Automate rechaza el guardado
+  con `ActionDescriptionTooLong` si una descripción pasa de 256. Sé conciso.
+- **Excel Online (Business):** su `$select` NO admite columnas con espacios (ej.
+  `Fecha Cumpleaños` → error OData). Si necesitas filtrar columnas, renombra la
+  columna en Excel sin espacios primero; si no, trae todas (sin `$select`).
+- **Ordenar un arreglo** es con la expresión `sort(coleccion, 'propiedad')` (o
+  `reverse(sort(...))`); una acción **Select** (Data Operations) NO ordena.
+
 ⚠️ **Permisos:** la vía de solución (formato moderno + modificar por zip) requiere
 que la cuenta tenga rol de **personalizador (System Customizer / Creador del
 entorno)** en el entorno. Si sale error de permisos (403 / "does not have

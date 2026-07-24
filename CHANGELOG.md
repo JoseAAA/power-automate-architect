@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.12.0] — 2026-07-23 · Modificar no desconecta + solución propia por cuenta
+
+### Corregido — dos fallos de raíz detectados en uso real (bitácora del tenant)
+- **Modificar un flujo ya NO pierde las conexiones.** Antes, una modificación podía
+  desenlazar las conexiones (el usuario tenía que reconectarlas) porque el proceso
+  reescribía el flujo completo. Ahora `actualizar` (`_fusionar_definicion`) cambia
+  **solo** `properties.definition` y **preserva** las `connectionReferences` reales
+  (los enlaces del usuario) — un cambio de lógica nunca obliga a reconectar. Solo se
+  agregan connection references de conectores NUEVOS que introduzca la edición.
+- **Identidad de solución/publisher PROPIA por cuenta** (`_identidad_solucion`). Antes
+  todas las cuentas compartían una solución/publisher fijos (`PowerAutomateArchitect`
+  / prefijo `pak`); si otra cuenta del mismo entorno ya tenía componentes ahí, la
+  segunda chocaba con **error 412 "matching key values already exists"** (contra
+  componentes que ni podía leer). Ahora cada cuenta trabaja en su propia solución
+  derivada de su usuario → sin choques ni contaminación cruzada.
+
+### Disciplina de modificar (skill pa-conectado) + lecciones del tenant
+- Reglas de oro al modificar: editar solo lo que cambia, no reescribir
+  `connectionReferences`, es el MISMO flujo (mismo ID) — nunca crear uno nuevo, y si
+  falla por permisos, reportarlo (no "resolverlo" duplicando el flujo).
+- Documentadas trampas reales: descripción de acción **≤ 256 chars**
+  (`ActionDescriptionTooLong`); Excel Online `$select` **no admite columnas con
+  espacios**; la acción **Select no ordena** (usar `sort(col, 'prop')`); si el portal
+  falla al importar un `.zip` con error genérico, suele ser glitch de UI (el paquete
+  está bien — entra por API).
+
+### Verificación
+- Eval del conector: preservación de connection references al modificar (test 15) e
+  identidad propia por cuenta (test 14). Suite completa verde.
+
 ## [1.11.0] — 2026-07-23 · Fallback sin permisos: siempre queda el .zip importable
 
 ### Agregado — si no puedes escribir en el tenant, igual hay entregable

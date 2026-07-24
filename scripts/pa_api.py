@@ -49,6 +49,7 @@ Requiere: pip install msal msal-extensions requests
 """
 import argparse
 import base64
+import hashlib
 import io
 import json
 import re
@@ -419,6 +420,26 @@ PUB_UNIQUE = "paarchitect"
 PUB_PREFIX = "pak"
 
 
+def _identidad_solucion():
+    """Identidad de solución/publisher PROPIA por cuenta activa (determinista).
+
+    Causa raíz del error 412 "A record with matching key values already exists":
+    antes TODAS las cuentas compartían la MISMA solución/publisher (`pak_`). Si dos
+    cuentas del mismo entorno creaban flujos, la segunda chocaba con connection
+    references de la primera que ni siquiera podía leer (403 invisible). Derivando
+    la identidad de la cuenta activa, cada cuenta trabaja en SU propia solución y
+    nunca pisa componentes ajenos. Ver bitácora del tenant analiticadedatos."""
+    usuario = str(_cargar_config().get("cuenta_activa") or "default").lower()
+    h = hashlib.sha1(usuario.encode("utf-8")).hexdigest()
+    return {
+        "sol_unique": f"PAArchitect_{h[:8]}",
+        "sol_friendly": SOL_FRIENDLY,
+        "pub_unique": f"paarchitect_{h[:8]}",
+        "pub_prefix": "pa" + h[:4],                       # 6 chars alfanuméricos
+        "opt_value_prefix": 20000 + (int(h[:4], 16) % 60000),  # 20000-79999, único por publisher
+    }
+
+
 def _dv_get(tok_dv, api, ruta):
     return _http("GET", f"{api}/api/data/v9.2/{ruta}", tok_dv)
 
@@ -431,26 +452,31 @@ def _dv_post(tok_dv, api, entity, cuerpo, solucion=None):
     return ent[ent.rfind("(") + 1: ent.rfind(")")] if "(" in ent else None
 
 
-def _asegurar_solucion(tok_dv, api):
-    """Devuelve (unique_name, prefijo) de la solucion dedicada, creandola si falta."""
-    r = _dv_get(tok_dv, api, f"solutions?$filter=uniquename eq '{SOL_UNIQUE}'&$select=solutionid")
-    pr = _dv_get(tok_dv, api, f"publishers?$filter=uniquename eq '{PUB_UNIQUE}'"
+def _asegurar_solucion(tok_dv, api, ident=None):
+    """Devuelve (unique_name, prefijo) de la solucion PROPIA de la cuenta, creandola
+    si falta. La identidad (nombre/publisher/prefijo) es por cuenta para no chocar
+    con componentes de otras cuentas (ver _identidad_solucion)."""
+    ident = ident or _identidad_solucion()
+    sol_u, sol_f = ident["sol_unique"], ident["sol_friendly"]
+    pub_u, pub_p, optv = ident["pub_unique"], ident["pub_prefix"], ident["opt_value_prefix"]
+    r = _dv_get(tok_dv, api, f"solutions?$filter=uniquename eq '{sol_u}'&$select=solutionid")
+    pr = _dv_get(tok_dv, api, f"publishers?$filter=uniquename eq '{pub_u}'"
                               "&$select=publisherid,customizationprefix")
     pub = (pr.get("value") or [None])[0]
     if r.get("value") and pub:
-        return SOL_UNIQUE, pub.get("customizationprefix", PUB_PREFIX)
+        return sol_u, pub.get("customizationprefix", pub_p)
     if not pub:
         pid = _dv_post(tok_dv, api, "publishers", {
-            "uniquename": PUB_UNIQUE, "friendlyname": SOL_FRIENDLY,
-            "customizationprefix": PUB_PREFIX, "customizationoptionvalueprefix": 72000})
-        prefijo = PUB_PREFIX
+            "uniquename": pub_u, "friendlyname": sol_f,
+            "customizationprefix": pub_p, "customizationoptionvalueprefix": int(optv)})
+        prefijo = pub_p
     else:
-        pid, prefijo = pub["publisherid"], pub.get("customizationprefix", PUB_PREFIX)
+        pid, prefijo = pub["publisherid"], pub.get("customizationprefix", pub_p)
     if not r.get("value"):
         _dv_post(tok_dv, api, "solutions", {
-            "uniquename": SOL_UNIQUE, "friendlyname": SOL_FRIENDLY, "version": "1.0.0.0",
+            "uniquename": sol_u, "friendlyname": sol_f, "version": "1.0.0.0",
             "publisherid@odata.bind": f"/publishers({pid})"})
-    return SOL_UNIQUE, prefijo
+    return sol_u, prefijo
 
 
 def _asegurar_connref(tok_dv, api, solucion, prefijo, conector, connection_id=None):
@@ -655,12 +681,33 @@ def modificar_flujo_zip(token, entorno, flow_id, workflows_json, client_id=None,
         for n in zin.namelist():
             data = zin.read(n)
             if n == target:
-                data = json.dumps(workflows_json, ensure_ascii=False).encode("utf-8")
+                data = _fusionar_definicion(zin.read(n), workflows_json)
             elif n.lower() == "solution.xml":
                 data = _subir_version_solucion(data)
             zout.writestr(n, data)
     importar_solucion(tok_dv, api, buf.getvalue())
     return {"via": "solución .zip (export→editar→import)", "respaldo": str(ruta), "solucion": solucion}
+
+
+def _fusionar_definicion(json_actual_bytes, editado):
+    """Núcleo de "modificar sin desconectar": toma el JSON REAL del flujo (el que
+    Microsoft exportó, con sus connection references YA ENLAZADAS por el usuario) y
+    le cambia SOLO `properties.definition` por la editada. NUNCA pisa
+    `connectionReferences`: por eso una modificación de lógica no obliga a
+    reconectar nada. Solo se SUMAN connection references de conectores NUEVOS que la
+    edición introduzca (los que ya estaban ganan y conservan su enlace)."""
+    actual = json.loads(json_actual_bytes.decode("utf-8"))
+    props_ed = editado.get("properties", editado) if isinstance(editado, dict) else {}
+    nueva_def = props_ed.get("definition") if isinstance(props_ed, dict) else None
+    if nueva_def is None:
+        raise PaApiError("El JSON editado no trae properties.definition (nada que aplicar).")
+    props = actual.setdefault("properties", {})
+    props["definition"] = nueva_def
+    existentes = props.get("connectionReferences") or {}
+    entrantes = props_ed.get("connectionReferences") or {}
+    # existentes GANAN (conservan el enlace del usuario); solo se agregan conectores nuevos
+    props["connectionReferences"] = {**entrantes, **existentes}
+    return json.dumps(actual, ensure_ascii=False).encode("utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -1474,7 +1521,8 @@ def cmd_crear(args):
     # tu carpeta. Util cuando ya sabes que no tienes permisos, o quieres el archivo
     # para pasarselo a quien sí los tiene. Es local y no destructivo: no pide --si.
     if getattr(args, "solo_zip", False):
-        zip_bytes, info = construir_solucion_zip(args.nombre, defn, connrefs, descripcion)
+        zip_bytes, info = construir_solucion_zip(args.nombre, defn, connrefs, descripcion,
+                                                 **_identidad_solucion())
         ruta = guardar_zip_local(zip_bytes, args.nombre, getattr(args, "carpeta", None))
         print(f"\nFlujo '{args.nombre}' empaquetado como solución (NO se subió al tenant; --solo-zip).")
         print(_instrucciones_importar(ruta, info["conexiones_sin_enlazar"]))
@@ -1498,7 +1546,8 @@ def cmd_crear(args):
     except PaApiError as e:
         # Fallback (lo que pediste): si no se pudo crear en el tenant, SIEMPRE dejamos
         # un resultado usable -> el .zip importable en tu carpeta + como subirlo a mano.
-        zip_bytes, info = construir_solucion_zip(args.nombre, defn, connrefs, descripcion)
+        zip_bytes, info = construir_solucion_zip(args.nombre, defn, connrefs, descripcion,
+                                                 **_identidad_solucion())
         ruta = guardar_zip_local(zip_bytes, args.nombre, getattr(args, "carpeta", None))
         es_permisos = any(t in str(e).lower() for t in
                           ("403", "permiso", "privilege", "does not have",
