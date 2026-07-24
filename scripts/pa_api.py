@@ -19,6 +19,7 @@ Uso:
   python pa_api.py exportar-flujo <flowId> --zip f.zip Descarga el .zip de solucion (respaldo)
   python pa_api.py actualizar <flowId> --archivo f.json --si  Modifica por .zip (paso 2)
   python pa_api.py salud [--detalle f.json]  Conexiones rotas, flujos afectados, suspendidos
+  python pa_api.py conexiones                Lista conexiones por conector y marca duplicadas
   python pa_api.py actualizar <flowId> --archivo f.json --si   Modifica un flujo (con respaldo)
   python pa_api.py crear --archivo f.json --nombre "X" --si    Crea un flujo (nace apagado)
   python pa_api.py crear ... --solo-zip     Solo genera el .zip importable (no toca el tenant)
@@ -1434,6 +1435,71 @@ def cmd_salud(args):
     return 0
 
 
+def reporte_conexiones(token_flow, token_pa, entorno):
+    """Agrupa las conexiones por conector y marca duplicados. Solo lectura.
+    Cruza con los flujos para decir cuales conexiones estan EN USO (no borrar esas)."""
+    from collections import defaultdict
+    conexiones = listar_conexiones(token_pa, entorno)
+    flujos = listar_flujos(token_flow, entorno)
+    # que connectionName usa cada flujo (por su connectionReferences)
+    en_uso = {}
+    for f in flujos:
+        p = f.get("properties", {}) or {}
+        cr = p.get("connectionReferences") or {}
+        for ref in (cr.values() if isinstance(cr, dict) else []):
+            cn = (ref or {}).get("connectionName") if isinstance(ref, dict) else None
+            if cn:
+                en_uso.setdefault(cn, []).append(p.get("displayName", "?"))
+    por_conector = defaultdict(list)
+    for c in conexiones:
+        p = c.get("properties", {}) or {}
+        conector = str(p.get("apiId", "")).split("/")[-1] or "?"
+        por_conector[conector].append({
+            "name": c.get("name"),
+            "display": p.get("displayName", "?"),
+            "estado": ", ".join(s.get("status", "?") for s in (p.get("statuses") or [])) or "?",
+            "rota": _conexion_rota(p),
+            "creado": _fecha(p.get("createdTime")),
+            "flujos": sorted(set(en_uso.get(c.get("name"), []))),
+        })
+    return {
+        "contrato": "pa-architect/conexiones@1", "entorno": entorno,
+        "total": len(conexiones),
+        "conectores": {k: v for k, v in sorted(por_conector.items())},
+        "duplicados": {k: len(v) for k, v in por_conector.items() if len(v) > 1},
+    }
+
+
+def cmd_conexiones(args):
+    token, usuario = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
+    entorno = args.entorno or entorno_por_defecto(token)
+    try:
+        token_pa, _ = _token_para(SCOPE_POWERAPPS, client_id=args.client_id, tenant=args.tenant)
+    except PaApiError:
+        raise PaApiError("No pude acceder a las conexiones (PowerApps). Cierra e inicia sesion.")
+    rep = reporte_conexiones(token, token_pa, entorno)
+    if args.como_json:
+        print(json.dumps(rep, ensure_ascii=False, indent=1))
+        return 0
+    print(f"CONEXIONES — entorno {entorno}  (conectado como {usuario})")
+    print(f"Total: {rep['total']}   |   Conectores con DUPLICADOS: {len(rep['duplicados'])}\n")
+    for conector, lista in rep["conectores"].items():
+        dup = "  ⚠️ DUPLICADAS" if len(lista) > 1 else ""
+        print(f"■ {conector}  ({len(lista)}){dup}")
+        for c in lista:
+            marca = "🔴" if c["rota"] else "🟢"
+            uso = f"  · en uso por: {', '.join(c['flujos'])}" if c["flujos"] else "  · sin flujo que la use"
+            print(f"   {marca} {c['display'][:34]:<34} creada {c['creado']}  [{c['estado']}]{uso}")
+        print()
+    if rep["duplicados"]:
+        print("Para limpiar (a mano, en make.powerautomate.com > Conexiones): deja UNA sana por")
+        print("conector — de preferencia la que está 'en uso por' tus flujos — y borra las demás.")
+        print("⚠️ No borres una que esté 'en uso' sin reemplazarla antes en el flujo.")
+    else:
+        print("Sin duplicados. 🟢")
+    return 0
+
+
 def cmd_auditar_todos(args):
     token, usuario = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
     entorno = args.entorno or entorno_por_defecto(token)
@@ -1683,6 +1749,10 @@ def main():
     p.add_argument("--detalle", help="ruta .json donde guardar el detalle")
     p.add_argument("--json", action="store_true", dest="como_json", help="salida estructurada (contrato estable)")
     p.set_defaults(fn=cmd_salud)
+    p = sub.add_parser("conexiones", help="Lista conexiones por conector y marca duplicadas (solo lectura)")
+    comunes(p)
+    p.add_argument("--json", action="store_true", dest="como_json", help="salida estructurada (contrato estable)")
+    p.set_defaults(fn=cmd_conexiones)
 
     def escritura(p):
         comunes(p)

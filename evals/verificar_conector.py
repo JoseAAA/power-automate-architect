@@ -349,6 +349,30 @@ def main():
     check("salud: reparto de estados correcto",
           salud["estados"]["Started"] == 2 and salud["estados"]["Suspended"] == 1)
 
+    # 13b. reporte_conexiones: agrupa por conector, marca DUPLICADOS y cuales estan en uso
+    pa_api.listar_conexiones = lambda t, e: [
+        {"name": "xl-1", "properties": {"displayName": "Excel A", "createdTime": "2026-07-20T10:00:00Z",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+            "statuses": [{"status": "Connected"}]}},
+        {"name": "xl-2", "properties": {"displayName": "Excel B", "createdTime": "2026-07-21T10:00:00Z",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_excelonlinebusiness",
+            "statuses": [{"status": "Connected"}]}},
+        {"name": "tm-1", "properties": {"displayName": "Teams", "createdTime": "2026-07-19T10:00:00Z",
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_teams",
+            "statuses": [{"status": "Connected"}]}},
+    ]
+    pa_api.listar_flujos = lambda t, e: [
+        {"name": "fx", "properties": {"displayName": "Usa Excel A",
+            "connectionReferences": {"shared_excelonlinebusiness": {"connectionName": "xl-1"}}}},
+    ]
+    repc = pa_api.reporte_conexiones("tf", "tp", "env")
+    check("conexiones: detecta duplicado de Excel (2) y Teams no",
+          repc["duplicados"].get("shared_excelonlinebusiness") == 2
+          and "shared_teams" not in repc["duplicados"])
+    check("conexiones: marca cuál está EN USO por un flujo (no borrar esa)",
+          any(c["name"] == "xl-1" and c["flujos"] == ["Usa Excel A"]
+              for c in repc["conectores"]["shared_excelonlinebusiness"]))
+
     # 14. creacion en FORMATO MODERNO (solucion + connection references, Shape B)
     pa_api.listar_conexiones = lambda t, e: [  # solo SharePoint tiene conexion -> se pre-enlaza
         {"name": "conn-sp-real", "properties": {"displayName": "SP",

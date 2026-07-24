@@ -41,7 +41,16 @@ python "scripts/pa_api.py" corridas <ID>
 python "scripts/pa_api.py" auditar <ID>     # descarga + auditoría local
 python "scripts/pa_api.py" auditar-todos --detalle informe.json  # tablero del tenant
 python "scripts/pa_api.py" salud --detalle salud.json  # conexiones rotas, suspendidos
+python "scripts/pa_api.py" conexiones  # conexiones por conector + DUPLICADAS + cuál está en uso
 ```
+
+Conexiones duplicadas ("se me llenó de conexiones repetidas"): `conexiones` las
+agrupa por conector, marca las duplicadas y dice cuál está EN USO por un flujo. La
+herramienta NO borra conexiones; para limpiar, el usuario deja UNA sana por conector
+(la que está en uso) y borra las demás a mano en el portal. Nunca borres una en uso
+sin reemplazarla antes en el flujo. Ojo: Power Automate a veces auto-provisiona
+conexiones (por eso se duplican solas); crear flujos reutilizando las existentes
+(el default) evita alimentar el problema.
 
 ## Procedimiento
 

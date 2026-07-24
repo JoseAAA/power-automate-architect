@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.16.0] — 2026-07-24 · Comando `conexiones` (ver y limpiar duplicados)
+
+### Agregado — `conexiones` (solo lectura)
+- Lista las conexiones **agrupadas por conector**, marca las **DUPLICADAS** y dice
+  cuál está **EN USO** por un flujo (para no borrar esa). Ayuda a limpiar el
+  desorden de conexiones repetidas de forma segura (la herramienta NO borra; el
+  usuario deja una sana por conector y borra el resto en el portal).
+- Confirmado en vivo: los duplicados aparecen **auto-provisionados por Power
+  Automate** (p. ej. varias conexiones creadas el mismo segundo, sin intervención
+  del usuario) — no los crea esta herramienta. Reutilizar conexiones al crear (el
+  default desde v1.15.0) evita alimentar el problema.
+
 ## [1.15.0] — 2026-07-24 · Reusar conexiones por defecto (no más duplicados)
 
 ### Cambiado — al crear, se REUTILIZA la conexión existente (antes: en blanco)
