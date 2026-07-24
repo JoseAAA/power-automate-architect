@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.13.0] — 2026-07-24 · Descargar el flujo como .zip (respaldo / otra IA)
+
+### Agregado — `exportar-flujo --zip`
+- Los flujos de solución **no** se pueden bajar como `.zip` desde el menú *Export*
+  del flujo en el portal (ahí solo aparece "Learn how" / "Get flow identifier"; el
+  "Export as package" es solo para flujos de "Mis flujos"). Ahora la herramienta lo
+  entrega directo: `exportar-flujo <ID> --zip flujo.zip` descarga el **paquete real
+  de solución** (re-importable), sin depender del portal y en cualquier laptop.
+  Ideal como **respaldo**, para **versionar** o **llevar el flujo a otra IA**.
+- `exportar-flujo` ahora acepta `--a` (JSON limpio, mejor para editar o dar a otra
+  IA) y/o `--zip` (paquete de respaldo); antes `--a` era obligatorio.
+- Validado en vivo (crear → exportar `--zip` → limpieza total) + eval offline (15b).
+
 ## [1.12.0] — 2026-07-23 · Modificar no desconecta + solución propia por cuenta
 
 ### Corregido — dos fallos de raíz detectados en uso real (bitácora del tenant)

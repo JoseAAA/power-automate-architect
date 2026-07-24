@@ -15,7 +15,8 @@ Uso:
   python pa_api.py corridas <flowId>       Historial de ejecuciones
   python pa_api.py auditar <flowId>        Descarga el flujo y corre el auditor local
   python pa_api.py auditar-todos [--detalle f.json]  Audita TODO el tenant (resumen)
-  python pa_api.py exportar-flujo <flowId> --a f.json  Exporta el JSON real para editar
+  python pa_api.py exportar-flujo <flowId> --a f.json  Exporta el JSON real (editar / otra IA)
+  python pa_api.py exportar-flujo <flowId> --zip f.zip Descarga el .zip de solucion (respaldo)
   python pa_api.py actualizar <flowId> --archivo f.json --si  Modifica por .zip (paso 2)
   python pa_api.py salud [--detalle f.json]  Conexiones rotas, flujos afectados, suspendidos
   python pa_api.py actualizar <flowId> --archivo f.json --si   Modifica un flujo (con respaldo)
@@ -655,6 +656,19 @@ def exportar_flujo_json(token, entorno, flow_id, client_id=None, tenant=None):
     if not target:
         raise PaApiError("El flujo no aparecio en el zip de la solucion.")
     return json.loads(zin.read(target).decode("utf-8"))
+
+
+def exportar_solucion_zip_de_flujo(token, entorno, flow_id, client_id=None, tenant=None):
+    """Devuelve (zip_bytes, solucion) del .zip de solucion que contiene el flujo: el
+    paquete REAL de Microsoft, re-importable (respaldo/versionar/compartir). Los
+    flujos de solucion no se pueden bajar como .zip desde el menu del flujo en el
+    portal (solo desde Soluciones); esto lo entrega directo, en cualquier laptop."""
+    inst, api = _entorno_dataverse(token, entorno)
+    if not inst:
+        raise PaApiError("El entorno no tiene Dataverse.")
+    tok_dv = _token_dv(inst, client_id, tenant)
+    wf_id, solucion = _preparar_flujo_en_solucion(tok_dv, api, flow_id)
+    return exportar_solucion(tok_dv, api, solucion), solucion
 
 
 def modificar_flujo_zip(token, entorno, flow_id, workflows_json, client_id=None, tenant=None):
@@ -1477,12 +1491,28 @@ def _preparar_escritura(args, necesita_archivo=True):
 def cmd_exportar_flujo(args):
     token, _ = _token_para(SCOPE_FLOW, client_id=args.client_id, tenant=args.tenant)
     entorno = args.entorno or entorno_por_defecto(token)
-    wf = exportar_flujo_json(token, entorno, args.flow_id,
-                             client_id=args.client_id, tenant=args.tenant)
-    Path(args.a).write_text(json.dumps(wf, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"JSON REAL del flujo exportado a: {args.a}")
-    print("Edita ese archivo (la definicion, dentro de properties.definition) y luego:")
-    print(f"  python pa_api.py actualizar {args.flow_id} --archivo {args.a} --si")
+    destino_zip = getattr(args, "zip", None)
+    if not args.a and not destino_zip:
+        raise PaApiError("Indica --a flujo.json (JSON limpio, ideal para editar o "
+                         "llevar a otra IA) y/o --zip flujo.zip (paquete re-importable "
+                         "de respaldo).")
+    if destino_zip:
+        zip_bytes, solucion = exportar_solucion_zip_de_flujo(
+            token, entorno, args.flow_id, client_id=args.client_id, tenant=args.tenant)
+        ruta_zip = Path(destino_zip)
+        ruta_zip.parent.mkdir(parents=True, exist_ok=True)
+        ruta_zip.write_bytes(zip_bytes)
+        print(f".zip de solución (respaldo re-importable) guardado en: {ruta_zip}")
+        print(f"  (es el paquete real de Microsoft con la solución '{solucion}'; "
+              "para reimportarlo: portal → Soluciones → Importar solución)")
+    if args.a:
+        wf = exportar_flujo_json(token, entorno, args.flow_id,
+                                 client_id=args.client_id, tenant=args.tenant)
+        Path(args.a).write_text(json.dumps(wf, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"JSON REAL del flujo exportado a: {args.a}")
+        print("  (definición dentro de properties.definition; ideal para revisar o dar a otra IA)")
+        print("Para modificarlo: edítalo y luego "
+              f"python pa_api.py actualizar {args.flow_id} --archivo {args.a} --si")
     return 0
 
 
@@ -1641,9 +1671,10 @@ def main():
     def escritura(p):
         comunes(p)
         p.add_argument("--si", action="store_true", help="ejecutar de verdad (sin esto: simulacion)")
-    p = sub.add_parser("exportar-flujo", help="Exporta el JSON REAL de un flujo para editarlo (paso 1 de modificar)")
+    p = sub.add_parser("exportar-flujo", help="Exporta un flujo: --a JSON (editar/otra IA) y/o --zip (respaldo re-importable)")
     comunes(p); p.add_argument("flow_id")
-    p.add_argument("--a", required=True, help="ruta .json donde guardar el JSON del flujo")
+    p.add_argument("--a", help="ruta .json donde guardar el JSON del flujo (editar / llevar a otra IA)")
+    p.add_argument("--zip", help="ruta .zip donde guardar el paquete de solución (respaldo re-importable)")
     p.set_defaults(fn=cmd_exportar_flujo)
     p = sub.add_parser("actualizar", help="Modificar un flujo por .zip de solucion (paso 2; con respaldo)")
     escritura(p); p.add_argument("flow_id")

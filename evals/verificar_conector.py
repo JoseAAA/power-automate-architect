@@ -412,6 +412,13 @@ def main():
     check("zip: el import lleva OverwriteUnmanagedCustomizations",
           (CAPTURADO.get("import_sol", ("", {}, {}))[1] or {}).get("OverwriteUnmanagedCustomizations") is True)
 
+    # 15b. exportar-flujo --zip: baja el .zip de solucion real (respaldo re-importable)
+    zbk, sol_bk = pa_api.exportar_solucion_zip_de_flujo(tok, "Default-tenant1", WF_ZIP_ID)
+    ztbk = zipfile.ZipFile(io.BytesIO(zbk))
+    check("exportar --zip: devuelve un .zip de solución con el flujo dentro",
+          any(n.startswith("Workflows/") for n in ztbk.namelist())
+          and "solution.xml" in ztbk.namelist())
+
     # 16. CONSTRUIR .zip importable desde cero + fallback de permisos en cmd_crear
     import xml.dom.minidom as _MD
     defn_z = json.loads(json.dumps(FLUJO_LIMPIO["definition"]))
