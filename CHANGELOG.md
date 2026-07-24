@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.14.0] — 2026-07-24 · Auditor: límite de 256 en notas + arreglo de falso positivo
+
+### Agregado — PA-DESC-01 (ALTA): descripción de acción > 256 caracteres
+- Power Automate rechaza el guardado con `ActionDescriptionTooLong` (máx. 256 por
+  descripción de acción). Ahora el auditor lo detecta y, al ser ALTA, la auditoría
+  previa de `crear`/`actualizar` lo **bloquea antes de subir** (te avisa qué acción
+  y cuántos caracteres) — así no llegas a que el portal lo rechace. Detectado en
+  uso real (bitácoras del tenant), dos veces.
+
+### Corregido — falso positivo de PA-DATE-01
+- PA-DATE-01 (zona horaria a mano con `addHours`) saltaba aunque `addHours` solo
+  apareciera dentro de una **Nota** que lo mencionaba al explicar que se había
+  reemplazado. Ahora la detección ignora notas/descripciones/metadata y solo mira
+  expresiones reales. Reglas: 40 → **41**.
+
 ## [1.13.0] — 2026-07-24 · Descargar el flujo como .zip (respaldo / otra IA)
 
 ### Agregado — `exportar-flujo --zip`

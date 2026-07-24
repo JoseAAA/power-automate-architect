@@ -1,6 +1,6 @@
 # Catálogo de reglas y mejores prácticas — Power Automate Architect
 
-> `actualizado: 2026-07-18` · **40 reglas automatizadas** en `scripts/auditar_flujo.py`.
+> `actualizado: 2026-07-24` · **41 reglas automatizadas** en `scripts/auditar_flujo.py`.
 > Fuentes normativas: **Microsoft Learn – Coding guidelines for cloud flows** (26
 > páginas), **Power Platform Well-Architected** y el **Power CAT Tools – Code Review**
 > de Microsoft (estándar de facto de revisión automatizada). Cómo refrescar: sección
@@ -108,6 +108,7 @@ el catálogo al día. Pesos: ALTA 15 · MEDIA 7 · BAJA 3 · INFO 0 (se descuent
 | **PA-NAME-01** (BAJA) | Acciones con nombre genérico | Nombres descriptivos = flujo legible | [naming-conventions](https://learn.microsoft.com/power-automate/guidance/coding-guidelines/use-consistent-naming-conventions) |
 | **PA-DOC-01** (BAJA) | Ausencia de *Notes* | Los comentarios del flujo explican el "por qué" | [peek-code-add-notes](https://learn.microsoft.com/power-automate/guidance/coding-guidelines/use-peekcode-addnotes) |
 | **PA-DOC-02** (BAJA) | Flujo sin descripción | Clave para mantenimiento y para que Copilot/agentes entiendan el flujo | [Power CAT](https://github.com/microsoft/Power-CAT-Tools/blob/main/CODE_REVIEW.md) |
+| **PA-DESC-01** (ALTA) | Descripción/nota de una acción > 256 caracteres | Power Automate rechaza el guardado (`ActionDescriptionTooLong`); el flujo no se puede guardar hasta acortarla | [peek-code-add-notes](https://learn.microsoft.com/power-automate/guidance/coding-guidelines/use-peekcode-addnotes) |
 
 ## Informativas (peso 0, no bajan puntuación)
 

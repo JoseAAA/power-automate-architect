@@ -230,6 +230,12 @@ REGLAS = {
         "quien es el dueno. Ademas, Copilot y los agentes la usan para entender el "
         "flujo como herramienta.",
         POWERCAT),
+    "PA-DESC-01": ("ALTA", 15, "Descripcion/nota de una accion supera el limite de 256 caracteres",
+        "Power Automate RECHAZA el guardado del flujo con el error "
+        "'ActionDescriptionTooLong' (maximo 256 caracteres por descripcion de accion). "
+        "Acorta la nota/descripcion de esa accion a 256 caracteres o menos, conservando "
+        "la idea principal. Si necesitas explicar mas, ponlo en la descripcion del flujo.",
+        f"{LEARN}/use-peekcode-addnotes"),
     # ---- Informativas (peso 0) -------------------------------------------------
     "PA-LIC-01": ("INFO", 0, "Usa conectores/acciones premium (nota de licencia)",
         "El flujo usa conectores premium (HTTP, Dataverse, SQL...): requiere licencia "
@@ -429,6 +435,19 @@ def _inputs_sin_host(acc):
     if isinstance(ins, dict):
         ins = {k: v for k, v in ins.items() if k != "host"}
     return json.dumps(ins if ins is not None else "", ensure_ascii=False)
+
+
+def _sin_notas(obj):
+    """Copia de la definicion SIN campos de nota/descripcion/metadata. Sirve para
+    buscar 'codigo' real (expresiones) sin que un match salte por el texto de una
+    Nota que solo MENCIONA una funcion al explicar que se reemplazo (ej. una nota
+    que dice 'se cambio addHours(...) por convertFromUtc' no es uso de addHours)."""
+    if isinstance(obj, dict):
+        return {k: _sin_notas(v) for k, v in obj.items()
+                if k not in ("description", "metadata")}
+    if isinstance(obj, list):
+        return [_sin_notas(v) for v in obj]
+    return obj
 
 
 def _fuente_norm(params):
@@ -720,8 +739,9 @@ def auditar(defn, connrefs, descripcion=""):
             if genericos_ag:
                 add("PA-AGT-02", f"trigger '{tn}': {', '.join(genericos_ag[:4])}")
 
-    # ---- PA-DATE-01: zona horaria a mano
-    if re.search(r"addHours\(\s*utcNow\(\)\s*,\s*-?\d+", texto_completo):
+    # ---- PA-DATE-01: zona horaria a mano (solo en expresiones reales, NO en Notas)
+    texto_codigo = json.dumps(_sin_notas(defn), ensure_ascii=False)
+    if re.search(r"addHours\(\s*utcNow\(\)\s*,\s*-?\d+", texto_codigo):
         add("PA-DATE-01")
 
     # ---- PA-TRG-01: trigger automatico sin condiciones
@@ -837,6 +857,13 @@ def auditar(defn, connrefs, descripcion=""):
     # ---- PA-DOC-02: flujo sin descripcion
     if not (descripcion or "").strip():
         add("PA-DOC-02")
+
+    # ---- PA-DESC-01: descripcion/nota de accion > 256 (Power Automate rechaza el guardado)
+    for n, a, _, _, _ in todas:
+        notas = [a.get("description"), (a.get("metadata") or {}).get("description")]
+        largo = max((len(x) for x in notas if isinstance(x, str)), default=0)
+        if largo > 256:
+            add("PA-DESC-01", f"accion '{n}' ({largo} caracteres)")
 
     # ---- PA-LIC-01: conectores premium (informativo)
     premium = set()

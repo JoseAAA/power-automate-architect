@@ -147,10 +147,10 @@ cambiando — todo **por lenguaje natural**, díselo al agente:
 
 ## 🧠 Cómo funciona (y por qué es seguro)
 
-- **El análisis pesado no lo hace la IA**: es un analizador determinista, 40 reglas
+- **El análisis pesado no lo hace la IA**: es un analizador determinista, 41 reglas
   en Python puro (también a mano: `python scripts/auditar_flujo.py "flujo.zip"`).
   El catálogo completo: [references/buenas-practicas.md](references/buenas-practicas.md),
-  con **40 reglas automatizadas** alineadas al Power CAT Tools Code Review de Microsoft.
+  con **41 reglas automatizadas** alineadas al Power CAT Tools Code Review de Microsoft.
 - **Local-first**: el auditor es 100% offline; los modos conectados hablan SOLO
   con APIs de Microsoft usando tu login delegado (MSAL, tokens en caché cifrada).
   Sin telemetría, sin backend del proyecto.
