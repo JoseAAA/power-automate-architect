@@ -371,14 +371,17 @@ def main():
     cd_m = json.loads((CAPTURADO.get("post_dv", ("", {}, {}))[1] or {}).get("clientdata", "{}"))
     cr_m = cd_m.get("properties", {}).get("connectionReferences", {})
     hdr_wf = CAPTURADO.get("post_dv", ("", {}, {}))[2] or {}
+    sol_propia = pa_api._identidad_solucion()["sol_unique"]  # identidad PROPIA por cuenta
     check("moderno: via solución", res_m.get("via", "").startswith("dataverse (solución"))
     check("moderno: clientdata usa Shape B (connectionReferenceLogicalName)",
           all("connectionReferenceLogicalName" in (v.get("connection") or {})
               for v in cr_m.values()) and len(cr_m) >= 1)
-    check("moderno: el POST del flujo lleva MSCRM.SolutionUniqueName",
-          hdr_wf.get("MSCRM.SolutionUniqueName") == pa_api.SOL_UNIQUE)
-    check("moderno: la connection reference se crea en la solución",
-          any((c[2] or {}).get("MSCRM.SolutionUniqueName") == pa_api.SOL_UNIQUE
+    check("moderno: identidad de solución PROPIA por cuenta (no la compartida fija)",
+          sol_propia != pa_api.SOL_UNIQUE and sol_propia.startswith("PAArchitect_"))
+    check("moderno: el POST del flujo lleva MSCRM.SolutionUniqueName (la propia)",
+          hdr_wf.get("MSCRM.SolutionUniqueName") == sol_propia)
+    check("moderno: la connection reference se crea en la solución propia",
+          any((c[2] or {}).get("MSCRM.SolutionUniqueName") == sol_propia
               for c in CAPTURADO.get("post_connref", [])))
     check("moderno: SharePoint (con conexión) se pre-enlaza; Office365 queda por autorizar",
           res_m.get("conexiones_sin_enlazar") == ["shared_office365"])
@@ -391,6 +394,7 @@ def main():
     check("zip: exportar-flujo devuelve el JSON REAL (con connectionReferences)",
           "connectionReferences" in wf.get("properties", {}) and "definition" in wf.get("properties", {}))
     wf["properties"]["definition"]["triggers"] = {"nuevo": {"type": "Recurrence"}}  # editar
+    wf["properties"]["connectionReferences"] = {}  # simular que la edición "borró" las conexiones
     CAPTURADO.pop("import_sol", None)
     res_zip = pa_api.modificar_flujo_zip(tok, "Default-tenant1", WF_ZIP_ID, wf)
     check("zip: via solución .zip", res_zip.get("via", "").startswith("solución .zip"))
@@ -401,6 +405,8 @@ def main():
     wf_imp = json.loads(zimp.read(wf_name).decode("utf-8"))
     check("zip: el import lleva la definicion EDITADA",
           "nuevo" in wf_imp["properties"]["definition"]["triggers"])
+    check("zip: modificar PRESERVA las connection references (no desconecta el flujo)",
+          "x" in (wf_imp["properties"].get("connectionReferences") or {}))
     check("zip: subio la version de la solucion (1.0.0.5 -> 1.0.0.6)",
           "1.0.0.6" in zimp.read("solution.xml").decode("utf-8"))
     check("zip: el import lleva OverwriteUnmanagedCustomizations",

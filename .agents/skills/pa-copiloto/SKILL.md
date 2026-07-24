@@ -129,6 +129,10 @@ Así siempre hay un entregable, aunque el tenant no te deje escribir por API.
 ✅ El formato del `.zip` está validado en vivo (import real aceptado por Microsoft,
 flujo creado como solución). Lo que SÍ debes recordarle al usuario: tras importar,
 el flujo nace apagado y hay que enlazar sus conexiones una vez y encenderlo.
+Nota: si al importar por el portal sale un error genérico ("Se ha producido un
+error, inténtelo más tarde"), suele ser un glitch de la UI/sesión del portal, NO
+del paquete — el mismo `.zip` entra bien por API. Reintentar o usar la vía por
+API (con permisos) resuelve; no descartes el `.zip` por ese mensaje.
 
 ## Paso 5 — Ponerlo a andar (manos del usuario)
 El flujo nace APAGADO. El comando te dice qué conexiones quedaron **sin enlazar**
