@@ -29,7 +29,7 @@ Agente ▸ PUNTUACIÓN: 55/100 → ACEPTABLE, requiere mejoras
 
 Tú ▸ aplica el arreglo del manejo de errores al flujo real
 
-Agente ▸ [SIMULACIÓN] Edité la definición y la re-auditė: 92/100 ✓
+Agente ▸ [SIMULACIÓN] Edité la definición y la re-audité: 92/100 ✓
          Antes de tocar el tenant haré un respaldo automático. ¿Confirmas?
 
 Tú ▸ sí
@@ -119,12 +119,19 @@ flujos están fallando por conexiones rotas?"*…
 | 🧭 **Por qué falló** un flujo | *"¿Por qué falló mi flujo de vacaciones esta semana?"* |
 | ✍️ **Corregir** un flujo | *"Agrégale manejo de errores a mi flujo de vacaciones y súbelo"* |
 | 🧙 **Crear** un flujo nuevo | *"Créame un flujo que pida aprobación cuando llegue una solicitud a SharePoint"* |
+| 💾 **Descargar/respaldar** un flujo | *"Descárgame ese flujo como .zip para respaldarlo"* |
+| 🔌 **Conexiones duplicadas** | *"Muéstrame mis conexiones y cuáles están repetidas"* |
 | 👥 **Ver/cambiar cuenta** | *"¿A qué cuenta estoy conectado?"* · *"Conéctate con mi cuenta de la empresa"* |
 | 🔄 **Catálogo al día** | *"¿Hay novedades de Power Automate? Actualiza las reglas si hace falta"* |
 
 El copiloto (crear) parte de **plantillas que auditan 100/100** y hace máximo
 2-3 preguntas. Las auditorías del tenant devuelven un **resumen compacto** (el
 detalle va a un archivo), así que auditar 1 o 500 flujos cuesta casi lo mismo.
+
+**¿Tu cuenta no tiene permisos para escribir en el tenant?** No te quedas sin
+resultado: el flujo se empaqueta como **`.zip` de solución importable** en
+`./flujos-locales/` y el agente te da el paso a paso para subirlo a mano (o
+pasárselo a alguien que sí tenga permisos).
 
 ---
 
@@ -153,7 +160,12 @@ cambiando — todo **por lenguaje natural**, díselo al agente:
   con **41 reglas automatizadas** alineadas al Power CAT Tools Code Review de Microsoft.
 - **Local-first**: el auditor es 100% offline; los modos conectados hablan SOLO
   con APIs de Microsoft usando tu login delegado (MSAL, tokens en caché cifrada).
-  Sin telemetría, sin backend del proyecto.
+  Sin telemetría, sin backend del proyecto. (La única otra salida a red es
+  opcional y sin credenciales: el actualizador de reglas consulta metadatos
+  públicos de los repos de documentación de Microsoft vía `api.github.com`.)
+- **Nada inventado**: cada regla cita su fuente oficial. Si el agente no sabe algo,
+  tiene instrucción de decírtelo y verificarlo en documentación oficial de
+  Microsoft (`learn.microsoft.com`) antes de afirmarlo — nunca de improvisar.
 - **Escritura con defensa en profundidad**: simulación por defecto, respaldo
   automático antes de tocar, auditoría previa que bloquea hallazgos graves, y la
   vía soportada por Microsoft (Dataverse) antes que APIs no soportadas.
@@ -169,9 +181,12 @@ cambiando — todo **por lenguaje natural**, díselo al agente:
 | **Dice que no hay sesión / no ve mis flujos** | Conéctate (paso B). Pregúntale *"¿a qué cuenta estoy conectado?"* para verificar. |
 | **"Se necesita aprobación del administrador"** | Tu tenant exige consentimiento: pídelo a TI, o usa una app propia con `--client-id` (ver [api-conexion.md](references/api-conexion.md)). |
 | **El agente no toma la última versión** | Actualiza el plugin: `/plugin marketplace update …` → `/plugin update …`. |
-| **Errores `jq: command not found`** | **No son de este plugin** — son de otro plugin tuyo (`claude-code-warp`). Instala `jq` (`winget install jqlang.jq`) o desactiva ese plugin. |
 | **Un flujo aparece "Suspendido"** | Lo bloqueó una política DLP del tenant; el reporte de salud te dice cuál. |
 | **Una conexión dice "Error"** | Se desconectó/caducó: reconéctala en make.powerautomate.com → Conexiones, y reactiva el flujo. |
+| **En el portal, *Export* no me deja bajar el .zip** | Es normal: los flujos **de solución** no ofrecen "Exportar como paquete". Pídeselo al agente (*"descárgame ese flujo como .zip"*) o ve a **Soluciones → Exportar**. |
+| **Se me llenó de conexiones repetidas** | Las suele auto-provisionar Power Automate. Pide *"muéstrame mis conexiones duplicadas"*: te dice cuál está **en uso** (esa no se toca) y cuáles limpiar en el portal. Al crear, la herramienta **reutiliza** las que ya tienes. |
+| **Error 403 / "no tienes permisos" al crear o modificar** | Tu cuenta necesita rol de **Creador del entorno / personalizador** (pídelo a tu admin). Mientras tanto, el agente te deja el **`.zip` importable** para subirlo a mano. |
+| **"ActionDescriptionTooLong" al guardar** | Una nota de acción pasa de **256 caracteres** (límite de Power Automate). El auditor ya lo detecta *antes* de subir y te dice cuál acortar. |
 
 ---
 

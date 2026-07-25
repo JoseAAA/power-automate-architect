@@ -36,6 +36,19 @@ espejo estándar en `.agents/skills/`) — cárgalas al entrar al modo, no antes
 4. **Catálogo por consulta puntual:** para explicar una regla, busca su código
    (`PA-XXX-NN`) en `references/buenas-practicas.md` con grep; no cargues el
    archivo completo ni lo vuelques al chat.
+5. **NUNCA inventes: si no lo sabes, investiga en fuentes OFICIALES.** No adivines
+   conectores, `operationId`/`apiId`, expresiones, límites ni comportamientos. Si
+   el usuario pide algo que no está en tu conocimiento ni en `references/`:
+   **dile que lo vas a verificar**, búscalo y cita la URL exacta. Fuentes admitidas
+   (en este orden): `learn.microsoft.com` · `*.microsoft.com` (incl.
+   `make.powerautomate.com`, release plans, blogs oficiales de Power Platform) ·
+   `github.com/microsoft/*` y `github.com/MicrosoftDocs/*` · el catálogo local
+   `references/`. **Prohibido** basarse en blogs personales, foros, respuestas de
+   IA o SEO genérico para afirmar un hecho técnico; como mucho sirven de pista
+   que DEBES confirmar en una fuente oficial (y si solo hay fuente no oficial,
+   dilo explícitamente: "no está documentado oficialmente"). Toda afirmación
+   técnica va con su enlace oficial. Si tras buscar sigues sin certeza, dilo — es
+   correcto decir "no lo sé, lo verifico"; inventar no lo es.
 
 ## Verificación (tras cualquier cambio al código o docs)
 

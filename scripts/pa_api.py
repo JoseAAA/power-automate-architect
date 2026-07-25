@@ -430,7 +430,7 @@ def _identidad_solucion():
     cuentas del mismo entorno creaban flujos, la segunda chocaba con connection
     references de la primera que ni siquiera podía leer (403 invisible). Derivando
     la identidad de la cuenta activa, cada cuenta trabaja en SU propia solución y
-    nunca pisa componentes ajenos. Ver bitácora del tenant cuenta-de-empresa."""
+    nunca pisa componentes ajenos (caso real reportado en un tenant compartido)."""
     usuario = str(_cargar_config().get("cuenta_activa") or "default").lower()
     h = hashlib.sha1(usuario.encode("utf-8")).hexdigest()
     return {

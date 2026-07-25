@@ -22,10 +22,13 @@ RAIZ = Path(__file__).resolve().parent.parent
 
 # archivo -> frases que DEBEN estar presentes (comparacion en minusculas)
 CANARIOS = {
-    "AGENTS.md": ["--si", "dry-run", "respaldo", "confirmación explícita", "pa-xxx-nn"],
+    # incluye la politica anti-invencion: solo fuentes OFICIALES, con enlace
+    "AGENTS.md": ["--si", "dry-run", "respaldo", "confirmación explícita", "pa-xxx-nn",
+                  "nunca inventes", "learn.microsoft.com"],
     "skills/pa-conectado/SKILL.md": ["--si", "dry-run", "respaldo", "auditoría previa",
                                      "confirmación explícita"],
     "skills/pa-auditoria/SKILL.md": ["🟢 ≥90"],
+    "skills/pa-copiloto/SKILL.md": ["nunca inventes", "learn.microsoft.com"],
 }
 
 DESCRIPCION_RE = re.compile(r"(?s)^---.*?description:\s*>\s*(.*?)\n---", re.M)
@@ -78,6 +81,37 @@ def main():
         check(f"plantilla {plantilla.name} audita 100/100",
               r.returncode == 0 and datos.get("puntuacion") == 100,
               f"exit={r.returncode}, puntuacion={datos.get('puntuacion')}")
+
+    # 4b. PRIVACIDAD: ningun dato real de tenant/empresa en los archivos versionados.
+    # Este repo es open source: correos, dominios de SharePoint o nombres de cuenta
+    # reales NO deben viajar. Solo se permiten dominios de ejemplo.
+    DOMINIOS_OK = ("example.com", "example.org", "contoso.com", "contoso.sharepoint.com",
+                   "empresa.com", "bigcorp.com", "tuempresa.com", "midominio.com",
+                   "microsoft.com", "github.com", "x.com")  # x.com: fixture de prueba
+    # anotaciones OData (publisherid@odata.bind) no son correos
+    NO_CORREO = ("odata.bind", "odata.etag", "odata.context", "odata.nextlink")
+    correo_re = re.compile(r"[A-Za-z0-9._%+\-]+@([A-Za-z0-9.\-]+\.[A-Za-z]{2,})")
+    sp_re = re.compile(r"https://([a-z0-9\-]+)\.sharepoint\.com", re.I)
+    rastreados = subprocess.run(["git", "ls-files"], cwd=RAIZ, capture_output=True,
+                                text=True, encoding="utf-8").stdout.split()
+    fugas = []
+    for rel in rastreados:
+        f = RAIZ / rel
+        if not f.is_file() or f.suffix.lower() not in (".md", ".py", ".json", ".txt", ".yml", ".yaml"):
+            continue
+        try:
+            texto = f.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for dom in correo_re.findall(texto):
+            d = dom.lower().rstrip(".")
+            if d not in DOMINIOS_OK and d not in NO_CORREO:
+                fugas.append(f"{rel}: correo @{d}")
+        for host in sp_re.findall(texto):
+            if host.lower() not in ("contoso", "example", "tuempresa"):
+                fugas.append(f"{rel}: sharepoint {host}")
+    check("privacidad: sin correos/dominios reales en archivos versionados",
+          not fugas, "; ".join(sorted(set(fugas))[:4]))
 
     # 5. descriptions: cortas y con disparador
     for skill_md in sorted((RAIZ / "skills").glob("*/SKILL.md")):

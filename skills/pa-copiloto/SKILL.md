@@ -37,8 +37,21 @@ el flujo lo amerita — pero explica por qué cada una importa.
 
 ### P2 — Investigar y presentar TODAS las opciones (gratis Y premium)
 Si algo no es obvio (¿qué conector extrae de un PDF? ¿el XML ya trae todo?),
-investígalo antes de prometerlo. No inventes conectores/acciones. Consulta
+investígalo antes de prometerlo. Consulta primero
 `${CLAUDE_PLUGIN_ROOT}/references/` (ia-en-flujos, api-conexion, buenas-practicas).
+
+⛔ **NUNCA inventes** conectores, acciones, `operationId`/`apiId`, expresiones ni
+límites. Si el flujo que te piden usa algo que no conoces con certeza:
+1. **Dile al usuario que lo vas a verificar** ("no lo doy por seguro, lo reviso en
+   la documentación oficial de Microsoft") — es correcto; inventar no lo es.
+2. Búscalo SOLO en fuentes oficiales: `learn.microsoft.com` (incl. la referencia
+   de conectores `learn.microsoft.com/connectors/<conector>/`), `*.microsoft.com`,
+   `github.com/microsoft|MicrosoftDocs/*`.
+3. **Cita la URL** al presentar la opción. Blogs/foros solo como pista a confirmar;
+   si algo solo aparece en fuente no oficial, dilo ("no está documentado
+   oficialmente") y ofrece una alternativa que sí lo esté.
+Prefiere siempre reutilizar `operationId`/`apiId` reales de las plantillas o de un
+flujo exportado del propio usuario antes que redactarlos de memoria.
 
 **NO te limites a conectores gratis/estándar ni asumas una cuenta free.** Para
 cada decisión con alternativas, presenta el **menú completo** con su trade-off y

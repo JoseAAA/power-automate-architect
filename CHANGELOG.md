@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.17.0] — 2026-07-24 · Revisión de publicación: anti-invención, privacidad, README
+
+### Agregado — regla de oro #5: NUNCA inventar, solo fuentes oficiales
+- `AGENTS.md` (canónica, la heredan Claude/Codex/Gemini/OpenCode) ahora exige: no
+  adivinar conectores, `operationId`/`apiId`, expresiones ni límites. Si el agente
+  no sabe algo debe **decirlo y verificarlo** en fuentes **oficiales**
+  (`learn.microsoft.com`, `*.microsoft.com`, `github.com/microsoft|MicrosoftDocs`)
+  y **citar la URL**. Blogs/foros solo como pista a confirmar; si algo solo existe
+  en fuente no oficial, debe declararlo como "no documentado oficialmente".
+- La skill `pa-copiloto` (donde más riesgo hay de inventar) refuerza el protocolo:
+  avisar → buscar en oficial → citar; y preferir `operationId` reales de plantillas
+  o de un flujo exportado del usuario antes que redactarlos de memoria.
+- Canarios en `verificar_docs.py` para que la política no se pierda con el tiempo.
+
+### Agregado — verificación automática de privacidad (repo open source)
+- `verificar_docs.py` escanea TODOS los archivos versionados y falla si aparece un
+  correo o dominio de SharePoint real (solo se permiten dominios de ejemplo). Se
+  probó que detecta fugas reales.
+- Limpiadas dos referencias a datos reales que quedaban en el árbol de trabajo
+  (una en `CHANGELOG.md` y otra en un docstring de `scripts/pa_api.py`).
+
+### Mejorado — README como guía de uso
+- Nuevos prompts de ejemplo (descargar/respaldar un flujo, ver conexiones
+  duplicadas) y explicación del fallback sin permisos (`.zip` importable).
+- Nuevos problemas comunes reales: *Export* no ofrece `.zip` en flujos de solución,
+  conexiones repetidas, 403 de permisos, `ActionDescriptionTooLong`.
+- Precisión: se declara que el actualizador de catálogo consulta `api.github.com`
+  (metadatos públicos, sin credenciales); se añade el punto "nada inventado".
+- Corregida una errata en el ejemplo de la demo.
+
+### Verificado (sin cambios de código)
+- Catálogo de reglas **al día** (41 reglas; fuentes oficiales sin cambios).
+- Seguridad: sin `shell=True`/`eval`/`exec`/`pickle`, sin `verify=False`, sin
+  impresión de tokens; `subprocess` siempre en forma de lista.
+- Portabilidad: el auditor es **stdlib puro** (sin `pip install`); sin sintaxis
+  atada a una versión concreta ni rutas dependientes del SO; espejo
+  `.agents/skills/` sincronizado y con todas sus rutas relativas válidas.
+- Coste de contexto: ~1.5k tokens fijos (guía + descripciones) y el resto bajo
+  demanda; los `references/` nunca se cargan enteros (consulta puntual por grep).
+
 ## [1.16.0] — 2026-07-24 · Comando `conexiones` (ver y limpiar duplicados)
 
 ### Agregado — `conexiones` (solo lectura)
@@ -156,7 +196,7 @@
   delegado, sin `pac`, sin terceros. Es el mecanismo para el modo modificar
   confiable (implementación en el siguiente paso).
 
-## [1.8.0] — 2026-07-20 · Prueba en vivo (cuenta-de-prueba): precisión y hallazgos
+## [1.8.0] — 2026-07-20 · Prueba en vivo contra un tenant real: precisión y hallazgos
 
 ### Corregido — precisión del puntaje (PA-SEC-02 falso positivo)
 - El auditor marcaba PA-SEC-02 ("conexión embebida") en flujos de solución que SÍ
