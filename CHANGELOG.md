@@ -23,6 +23,9 @@ Respuestas legibles y verificables de un vistazo (inspirado en `juliusbrussee/ca
 (`código · severidad · qué pasa · arreglo`), tabla si hay >3 ítems, y nunca volcar
 `references/`, JSON crudo ni la salida completa de un script. Menos tokens y más útil.
 
+El README lo documenta en "Cómo funciona" con una tabla de qué hace según lo que
+pidas (consultar / cambio puntual / algo grande).
+
 ### Agregado — cómo quitarte las preguntas de "ejecutar comando"
 El README explica ahora que `allowed-tools` **no** aprueba comandos (verificado en la
 documentación oficial de permisos) y trae un `permissions.allow` listo para pegar que

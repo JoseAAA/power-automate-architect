@@ -192,7 +192,21 @@ cambiando — todo **por lenguaje natural**, díselo al agente:
 - **Escritura con defensa en profundidad**: simulación por defecto, respaldo
   automático antes de tocar, auditoría previa que bloquea hallazgos graves, y la
   vía soportada por Microsoft (Dataverse) antes que APIs no soportadas.
+- **No te interroga**: el esfuerzo es proporcional a lo que pides — consultar no
+  cuesta preguntas, cambiar cuesta una sola (ver abajo).
 - Modelo de seguridad completo para TI: [SECURITY.md](SECURITY.md).
+
+### Sin interrogatorios: una aprobación por tarea
+
+| Le pides… | Qué hace |
+|---|---|
+| **Consultar** (listar, auditar, salud, conexiones, por qué falló) | Lo hace y ya. **Sin plan y sin preguntas** |
+| **Un cambio puntual** (encender/apagar, un arreglo) | Plan de 3 líneas → **tu OK** → lo aplica |
+| **Algo grande** (crear un flujo, refactor) | Plan corto con las dudas agrupadas → **tu OK** → lo hace todo seguido |
+
+Las preguntas van **juntas en el plan**, no goteando a mitad del trabajo; si hay una
+opción razonable por defecto, la toma y te la dice. Y las respuestas van al punto:
+una línea por hallazgo, sin muros de texto.
 
 ---
 
