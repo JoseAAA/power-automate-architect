@@ -29,7 +29,11 @@ CANARIOS = {
                                      "confirmación explícita"],
     "skills/pa-auditoria/SKILL.md": ["🟢 ≥90"],
     "skills/pa-copiloto/SKILL.md": ["nunca inventes", "learn.microsoft.com"],
+    # triaje proporcional: lectura sin plan, escritura con UN plan y UN OK
+    "skills/pa-flujos/SKILL.md": ["no armes un plan"],
 }
+CANARIOS["AGENTS.md"] += ["triaje", "al punto", "una aprobación por tarea"]
+CANARIOS["skills/pa-conectado/SKILL.md"] += ["un solo plan, un solo ok"]
 
 DESCRIPCION_RE = re.compile(r"(?s)^---.*?description:\s*>\s*(.*?)\n---", re.M)
 

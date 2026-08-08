@@ -36,15 +36,17 @@ preguntas.
    Devuelve: puntuacion 0-100, veredicto, y los hallazgos `[ALTA]/[MEDIA]/[BAJA]`
    con su arreglo y la fuente oficial.
 
-3. **Presenta el resultado en Markdown en el chat**, en este orden:
-   - **Resumen ejecutivo (para no expertos):** una frase con el veredicto + la
-     puntuacion como semaforo (🟢 ≥90 · 🟡 75-89 · 🟠 50-74 · 🔴 <50) + "lo mas
-     urgente es X".
-   - **Tabla de hallazgos** ordenada por severidad: columnas *Severidad · Que pasa
-     (en simple) · Como se arregla*. Traduce el codigo PA-xxx a lenguaje humano.
-   - **Lo bueno:** menciona 1-2 cosas que el flujo ya hace bien (motiva).
-   - Cierre con UNA oferta de accion: *"¿Quiero que te prepare los pasos para
-     aplicar el arreglo #1?"* (no una bateria de preguntas).
+3. **Presenta el resultado AL PUNTO** (el usuario debe poder leerlo entero y
+   verificarlo). Markdown, en este orden y sin relleno:
+   - **Una frase**: puntuación con semáforo (🟢 ≥90 · 🟡 75-89 · 🟠 50-74 · 🔴 <50)
+     + lo más urgente. Nada de preámbulos ("he analizado tu flujo y…").
+   - **Tabla de hallazgos**, una LÍNEA por hallazgo, ordenada por severidad:
+     *Código · Severidad · Qué pasa (simple) · Arreglo*. Deja el código `PA-XXX-NN`
+     visible (sirve para rastrearlo), pero **resume**: no copies la descripción
+     larga del catálogo ni pegues la salida cruda del script.
+   - **Lo bueno:** 1-2 cosas que el flujo ya hace bien (una línea).
+   - Cierre con UNA oferta de acción concreta (no una batería de preguntas).
+   - El "porqué" de una regla y su fuente: **solo si el usuario los pide**.
    - Cargas condicionales (no cargues todo de una vez):
 
      | Lee | Solo cuando |

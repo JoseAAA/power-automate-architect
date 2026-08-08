@@ -52,6 +52,17 @@ sin reemplazarla antes en el flujo. Ojo: Power Automate a veces auto-provisiona
 conexiones (por eso se duplican solas); crear flujos reutilizando las existentes
 (el default) evita alimentar el problema.
 
+## 🟢 Carril de LECTURA: actúa, no planifiques
+Todo lo de esta skill es **solo lectura**: no cambia nada en el tenant. Por eso:
+- **NO armes un plan ni pidas aprobación** para listar, auditar, ver salud,
+  conexiones, corridas o exportar. Encadena los comandos que hagan falta y entrega
+  el resultado. Preguntar aquí solo estorba (el usuario ya te dijo qué quiere).
+- **No narres cada comando.** Ejecuta y responde con la conclusión; el detalle
+  técnico va después y en corto.
+- Únicas paradas legítimas: falta sesión (→ login en 2 pasos), el nombre del flujo
+  es ambiguo (→ muestra las coincidencias y pregunta UNA vez), o el usuario pide
+  algo que ya es escritura (→ cambia a `pa-conectado`/`pa-copiloto`).
+
 ## Procedimiento
 
 0. **Gestión de cuentas POR LENGUAJE NATURAL (tú corres los comandos, no el usuario).**

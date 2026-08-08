@@ -135,6 +135,29 @@ pasárselo a alguien que sí tenga permisos).
 
 ---
 
+## ⚡ ¿Te pide permiso en cada comando? (opcional, recomendado)
+
+El agente ejecuta comandos locales y tu herramienta te pide permiso **por cada
+uno**. Para las consultas de **solo lectura** eso es puro ruido. En Claude Code
+puedes aprobarlas una vez añadiendo esto a `.claude/settings.json`:
+
+```jsonc
+{ "permissions": { "allow": [
+  "Bash(python * auditar_flujo.py*)",
+  "Bash(python * pa_api.py sesion*)",   "Bash(python * pa_api.py entornos*)",
+  "Bash(python * pa_api.py flujos*)",   "Bash(python * pa_api.py flujo *)",
+  "Bash(python * pa_api.py corridas*)", "Bash(python * pa_api.py auditar*)",
+  "Bash(python * pa_api.py salud*)",    "Bash(python * pa_api.py conexiones*)",
+  "Bash(python * pa_api.py exportar-flujo*)"
+] } }
+```
+
+**Solo lectura.** `crear`, `actualizar`, `encender` y `apagar` **siguen pidiendo tu
+confirmación** — la red de seguridad no se toca. Y el agente ya no arma planes ni
+pregunta para consultas: solo cuando de verdad va a cambiar algo.
+
+---
+
 ## 👥 Varias cuentas (personal / empresa)
 
 Si tus flujos de trabajo están en otra cuenta, puedes tener varias e ir

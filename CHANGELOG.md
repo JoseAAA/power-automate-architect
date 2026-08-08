@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.18.0] — 2026-08-08 · Triaje proporcional: menos preguntas, respuestas al punto
+
+### Cambiado — el esfuerzo ahora es proporcional a lo que pides
+Problema real reportado: el asistente preguntaba demasiado, incluso para consultas
+de solo lectura. Ahora clasifica la petición ANTES de actuar (patrón de *smart
+routing*, inspirado en `firecrawl/pdf-inspector`) y elige carril:
+- 🟢 **Lectura** (listar, auditar, salud, conexiones, corridas, exportar): **sin plan
+  y sin preguntas** — ejecuta y entrega el resultado.
+- 🟡 **Escritura simple** (encender/apagar, un cambio puntual): plan de ≤3 líneas + 1 OK.
+- 🔴 **Escritura compleja** (crear un flujo, refactor): plan corto (≤8 líneas) + 1 OK,
+  y luego **ejecuta todo seguido** sin volver a preguntar.
+
+Regla central: **una aprobación por TAREA, no por comando**. Las dudas de negocio se
+agrupan DENTRO del plan (nunca goteando a mitad del trabajo) y, si hay un default
+sensato, el asistente decide y lo dice. La red de seguridad no cambia: la escritura
+sigue exigiendo `--si`, respaldo automático y auditoría previa.
+
+### Agregado — regla de oro #2: responder AL PUNTO
+Respuestas legibles y verificables de un vistazo (inspirado en `juliusbrussee/caveman`:
+"achica la boca, no el cerebro"): empezar por la conclusión, **una línea por hallazgo**
+(`código · severidad · qué pasa · arreglo`), tabla si hay >3 ítems, y nunca volcar
+`references/`, JSON crudo ni la salida completa de un script. Menos tokens y más útil.
+
+### Agregado — cómo quitarte las preguntas de "ejecutar comando"
+El README explica ahora que `allowed-tools` **no** aprueba comandos (verificado en la
+documentación oficial de permisos) y trae un `permissions.allow` listo para pegar que
+autoriza **solo las consultas de lectura**; `crear/actualizar/encender/apagar` siguen
+pidiendo confirmación.
+
+### Sin cambios para Claude Code
+Estructura del plugin, `plugin.json`, rutas `${CLAUDE_PLUGIN_ROOT}` y frontmatter
+intactos: solo cambia el comportamiento descrito en las skills. Canarios nuevos en
+`verificar_docs.py` para que el triaje no se pierda con el tiempo.
+
 ## [1.17.0] — 2026-07-24 · Revisión de publicación: anti-invención, privacidad, README
 
 ### Agregado — regla de oro #5: NUNCA inventar, solo fuentes oficiales

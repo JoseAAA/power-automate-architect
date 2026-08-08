@@ -15,6 +15,26 @@ Cierra el ciclo **auditar → corregir → subir → validar** sin reconstruir a
 El asistente edita el JSON; `pa_api.py` sube por la vía soportada (Dataverse;
 maker API solo legacy — el script decide y lo dice).
 
+## 🟡🔴 Un solo plan, un solo OK (no preguntes paso a paso)
+Aquí SÍ hay plan porque se cambia algo real. Pero **uno solo, al inicio**:
+
+1. **Investiga primero en silencio** (exportar el flujo, auditarlo, ver corridas):
+   eso es lectura, no la anuncies ni pidas permiso.
+2. **Presenta UN plan compacto** (≤8 líneas) y pide UNA aprobación:
+   - *Qué haré* (en simple) · *Qué toco* (flujo/acciones) · *Riesgo* ·
+     *Cómo se revierte* (respaldo automático) · *Preguntas* (agrupadas AQUÍ, si las hay).
+   - Si una duda tiene un default sensato, **decide y dilo** en vez de preguntar.
+3. **Con el OK, ejecuta TODO seguido** (editar → auditar → `--si` → validar) sin
+   volver a preguntar. Solo te detienes si aparece algo que cambia el plan: di QUÉ
+   cambió y re-pide una vez.
+4. Cierra en 3-4 líneas: qué quedó, score antes→después, ruta del respaldo.
+
+| Excusa para volver a preguntar | Realidad |
+|---|---|
+| "Quiero confirmar cada paso" | El OK del plan ya cubrió los pasos del plan |
+| "Salió un detalle menor" | Si no cambia el resultado ni el riesgo, decide y sigue |
+| "Es más seguro preguntar" | Preguntar de más agota al usuario; el `--si` y el respaldo ya son la red |
+
 ## Red de seguridad (integrada en el script — no la rodees)
 1. **Respaldo automático** previo en `~/.power-automate-architect/respaldos/` →
    revertir = `actualizar <ID> --archivo <respaldo> --si`.

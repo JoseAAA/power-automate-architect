@@ -22,6 +22,12 @@ JSON**. Hay DOS caminos según la complejidad — elige al entrar:
 
 Ante la duda o si el usuario dice "vamos armándolo/iterando", usa plan-primero.
 
+⚡ **Regla de fricción (vale para los dos caminos):** agrupa TODAS las preguntas en
+UNA sola ronda; nunca las sueltes de a una. Si una duda tiene un default sensato,
+decide y dilo en el plan ("asumo X; dime si no"). Tras el OK del plan, ejecuta
+seguido sin volver a preguntar. Investigar (leer plantillas, auditar, consultar
+`references/`) es lectura: hazlo en silencio, sin pedir permiso ni narrarlo.
+
 ---
 # Modo plan-primero (colaborativo e iterativo)
 

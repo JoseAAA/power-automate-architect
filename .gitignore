@@ -15,6 +15,7 @@ token_cache*.json
 *.zip
 flujos-locales/
 ejemplos/
+examples/
 
 # SO / editor
 .DS_Store
